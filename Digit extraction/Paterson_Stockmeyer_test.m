@@ -28,3 +28,16 @@ Zft := quo<Zt_poly | f>;
 Zft_poly := PolynomialRing(Zft);
 result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
 "Test Paterson-Stockmeyer on ciphertext", result eq Decrypt(evl, sk);
+
+// Test depth of the procedure
+degree := 127;
+poly := x ^ degree;
+res := PatersonStockmeyer(poly, [0], func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y) else
+                                                 (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
+                                                 (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+                                                 [Maximum(x[1], y[1])]>,
+                                     func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y) else
+                                                 (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
+                                                 (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+                                                 [Maximum(x[1], y[1]) + 1]>);
+"Test non-scalar depth of Paterson-Stockmeyer", res[1] eq Ceiling(Log(2, degree));
