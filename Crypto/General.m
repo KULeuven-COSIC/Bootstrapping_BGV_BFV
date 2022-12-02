@@ -133,6 +133,11 @@ function IsCoprimeFactorization(m, factors_m)
     return true;
 end function;
 
+// Compute the largest power of two that is smaller than the given number
+function FloorPowerOfTwo(element)
+    return 2 ^ Floor(Log(2, element));
+end function;
+
 // Check if the given parameter is a power of two
 function IsPowerOfTwo(m)
     result, p, r := IsPrimePower(m);
