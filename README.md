@@ -14,5 +14,5 @@ The code is divided over the following folders:
 ## Installation
 
 * Obtain a Magma license from http://magma.maths.usyd.edu.au/magma.
-* Start Magma and change to the root of this repository via the “ChangeDirectory” command.
+* Start Magma and change to the root directory of this repository via the “ChangeDirectory” command.
 * Load the desired file via the “load” command.
