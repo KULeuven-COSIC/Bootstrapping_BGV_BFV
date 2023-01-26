@@ -2,7 +2,7 @@
 
 Magma implementation of bootstrapping for BGV and BFV.
 
-Any bugs can be reported at robin.geelen@esat.kuleuven.be.
+Any bugs can be reported to robin.geelen@esat.kuleuven.be.
 
 ## Content
 
