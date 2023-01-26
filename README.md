@@ -2,6 +2,8 @@
 
 Magma implementation of bootstrapping for BGV and BFV.
 
+Any bugs can be reported at robin.geelen@esat.kuleuven.be.
+
 ## Content
 
 The code is divided over the following folders:
