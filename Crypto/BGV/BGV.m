@@ -223,6 +223,6 @@ function HomomorphicInnerProduct(c, bootKey, additionConstant)
     u := AddConstant(MulConstant(bootKey, CenteredReduction(p_to_the_v * c[1][2], new_modulus)),
                                           CenteredReduction(p_to_the_v * c[1][1], new_modulus));   // Homomorphic inner product
 
-    // Replace rounding by flooring
-    return AddConstant(u, additionConstant);
+    // Replace rounding by flooring for odd p
+    return (p eq 2) select AddConstant(u, additionConstant) else u;
 end function;

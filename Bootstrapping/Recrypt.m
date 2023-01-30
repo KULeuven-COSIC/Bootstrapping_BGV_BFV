@@ -136,10 +136,10 @@ function Recrypt(c, recrypt_variables)
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     for ind := 1 to #unpacked_u do
-        unpacked_u[ind] := ChenHanDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
-                                                                      henselExponentCiphertext - GetHenselExponent(c),
-                                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                                  div_pFunc, liftingPolynomial, lowestDigitRetainPolynomials);
+        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
+                                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                              div_pFunc, lowestDigitRetainPolynomials);
     end for;
 
     // Repack the slots

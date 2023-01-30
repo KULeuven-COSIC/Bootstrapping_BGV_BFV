@@ -50,8 +50,7 @@ function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExp
     rotationSwitchKeys, coefficientSwitchKeys := GenerateSwitchKeysThinRecrypt(sk);
     additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
     liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
-                                     iteration in [1..Maximum(henselExponentPlaintext, henselExponentCiphertext)]];
+    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
 
     return <rk, bootKey, adapted_sparseConstants, adapted_sparseInvConstants, rotationSwitchKeys, coefficientSwitchKeys,
             additionConstant, liftingPolynomial, lowestDigitRetainPolynomials>;
@@ -81,10 +80,10 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return ChenHanDigitExtraction(u, p, henselExponentCiphertext,
-                                        henselExponentCiphertext - GetHenselExponent(c),
-                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                  div_pFunc, liftingPolynomial, lowestDigitRetainPolynomials);
+    return OurDigitExtraction(u, p, henselExponentCiphertext,
+                                    henselExponentCiphertext - GetHenselExponent(c),
+                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                              div_pFunc, lowestDigitRetainPolynomials);
 end function;
 
 else
@@ -236,10 +235,10 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return ChenHanDigitExtraction(u, p, henselExponentCiphertext,
-                                        henselExponentCiphertext - GetHenselExponent(c),
-                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                  div_pFunc, liftingPolynomial, lowestDigitRetainPolynomials);
+    return OurDigitExtraction(u, p, henselExponentCiphertext,
+                                    henselExponentCiphertext - GetHenselExponent(c),
+                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                              div_pFunc, lowestDigitRetainPolynomials);
 end function;
 
 end if;

@@ -188,6 +188,6 @@ function HomomorphicInnerProduct(c, bootKey, additionConstant)
     c := ModSwitch(c, p ^ henselExponentCiphertext);            // Mod switch to lowest possible modulus
     u := AddConstant(MulConstant(bootKey, c[1][2]), c[1][1]);   // Homomorphic inner product
 
-    // Replace rounding by flooring
-    return AddConstant(u, additionConstant);
+    // Replace rounding by flooring for odd p
+    return (p eq 2) select AddConstant(u, additionConstant) else u;
 end function;
