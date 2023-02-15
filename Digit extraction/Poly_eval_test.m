@@ -7,12 +7,12 @@ for i := 1 to 10000 do
     d := Random(50) + 1;
     poly := (x ^ d) + Zx![Random(10) - 5 : i in [1..d]];
     element := Random(10) - 5;
-    if PatersonStockmeyer(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
+    if PolyEval(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
         res := false;
         break;
     end if;
 end for;
-"Test Paterson-Stockmeyer on integer polynomial", res;
+"Test baby-step/giant-step on integer polynomial", res;
 
 sk, pk := GenKeyPair();
 rk := GenRelinKey(sk);
@@ -20,29 +20,29 @@ m := RandPol(t);
 c := Encrypt(m, t, pk);
 degree := 50;
 poly := (x ^ degree) + Zx![Random(t) : i in [1..degree]];
-evl := PatersonStockmeyer(poly, c, addFunc, func<x, y | mulFunc(x, y, rk)>);
-//evl := PatersonStockmeyer(poly, c, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
-//                          lazy := true, sanitizeFunc := func<x | relinFunc(x, rk)>);
+evl := PolyEval(poly, c, addFunc, func<x, y | mulFunc(x, y, rk)>);
+//evl := PolyEval(poly, c, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
+//                lazy := true, sanitizeFunc := func<x | relinFunc(x, rk)>);
 
 Zft := quo<Zt_poly | f>;
 Zft_poly := PolynomialRing(Zft);
 result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
-"Test Paterson-Stockmeyer on ciphertext", result eq Decrypt(evl, sk);
+"Test baby-step/giant-step on ciphertext", result eq Decrypt(evl, sk);
 
 
 
 // Test depth of the procedure
 degree := 127;
 poly := x ^ degree + x ^ (degree - 1);
-res := PatersonStockmeyer(poly, [0], func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                            else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
-                                                 (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
-                                                 [Maximum(x[1], y[1])]>,
-                                     func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                            else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
-                                                 (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
-                                                 [Maximum(x[1], y[1]) + 1]>);
-"Test non-scalar depth of Paterson-Stockmeyer", res[1] eq Ceiling(Log(2, degree));
+res := PolyEval(poly, [0], func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
+                                  else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
+                                       (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+                                       [Maximum(x[1], y[1])]>,
+                           func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
+                                  else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
+                                       (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+                                       [Maximum(x[1], y[1]) + 1]>);
+"Test non-scalar depth of baby-step/giant-step", res[1] eq Ceiling(Log(2, degree));
 
 
 
@@ -52,12 +52,12 @@ for i := 1 to 1000 do
     d := Random(25) + 1;
     poly := Evaluate((x ^ d) + Zx![Random(10) - 5 : i in [1..d]], x^2);
     element := Random(10) - 5;
-    if PatersonStockmeyer(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
+    if PolyEval(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
         res := false;
         break;
     end if;
 end for;
-"Test Paterson-Stockmeyer on even polynomial", res;
+"Test baby-step/giant-step on even polynomial", res;
 
 // Test odd polynomials
 res := true;
@@ -65,12 +65,12 @@ for i := 1 to 1000 do
     d := Random(25) + 1;
     poly := Evaluate((x ^ d) + Zx![Random(10) - 5 : i in [1..d]], x^2) * x;
     element := Random(10) - 5;
-    if PatersonStockmeyer(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
+    if PolyEval(poly, element, func<x, y | x + y>, func<x, y | x * y>) ne Evaluate(poly, element) then
         res := false;
         break;
     end if;
 end for;
-"Test Paterson-Stockmeyer on odd polynomial", res;
+"Test baby-step/giant-step on odd polynomial", res;
 
 
 
@@ -156,7 +156,7 @@ res1 := true; res2 := true; res3 := true;
 for degree := 1 to 50 do
     // Usual polynomial evaluation
     poly := Zx![Random(1, t) : i in [0..degree]];
-    evl := PatersonStockmeyer(poly, <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
+    evl := PolyEval(poly, <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
     result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
     _, _, nb_operations := GetBestParameters(poly);
     res1 and:= (result eq Decrypt(evl[1], sk)) and #evl[2] eq nb_operations;
@@ -164,23 +164,23 @@ for degree := 1 to 50 do
     // Do the same for odd polynomials
     half_degree := degree div 2;
     poly := Evaluate(Zx![Random(1, t) : i in [0..half_degree]], x^2) * x;
-    evl := PatersonStockmeyer(poly, <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
+    evl := PolyEval(poly, <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
     result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
     _, _, nb_operations := GetBestParameters(poly);
     res2 and:= (result eq Decrypt(evl[1], sk)) and #evl[2] eq nb_operations;
 
     // Do the same for lazy relinearization
     poly := Zx![Random(1, t) : i in [0..degree]];
-    evl := PatersonStockmeyer(poly, <c, {Z | }>, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
-                              lazy := true, sanitizeFunc := func<x | relinFunc(x, rk)>);
+    evl := PolyEval(poly, <c, {Z | }>, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
+                    lazy := true, sanitizeFunc := func<x | relinFunc(x, rk)>);
     result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
     _, _, nb_operations := GetBestParameters(poly: lazy := true);
     res3 and:= (result eq Decrypt(evl[1], sk)) and #evl[2] eq nb_operations;
 end for;
 
-"Test Paterson-Stockmeyer number of operations", res1;
-"Test Paterson-Stockmeyer number of operations odd polynomial", res2;
-"Test Paterson-Stockmeyer number of operations lazy relinearization", res3;
+"Test baby-step/giant-step number of operations", res1;
+"Test baby-step/giant-step number of operations odd polynomial", res2;
+"Test baby-step/giant-step number of operations lazy relinearization", res3;
 
 // Perform tests for simultaneous evaluation of multiple polynomials
 res1 := true; res2 := true; res3 := true;
@@ -189,7 +189,7 @@ for degree2 := 1 to 50 do
     // Usual polynomial evaluation
     poly1 := Zx![Random(1, t) : i in [0..degree1]];
     poly2 := Zx![Random(1, t) : i in [0..degree2]];
-    evl := PatersonStockmeyer([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
+    evl := PolyEval([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
     result1 := Zx!Evaluate(Zft_poly!Zt_poly!poly1, Zft!Zt_poly!m);
     result2 := Zx!Evaluate(Zft_poly!Zt_poly!poly2, Zft!Zt_poly!m);
     _, _, nb_operations := GetBestParameters([poly1, poly2]);
@@ -201,7 +201,7 @@ for degree2 := 1 to 50 do
     half_degree2 := degree2 div 2;
     poly1 := Evaluate(Zx![Random(1, t) : i in [0..half_degree1]], x^2) * x;
     poly2 := Evaluate(Zx![Random(1, t) : i in [0..half_degree2]], x^2) * x;
-    evl := PatersonStockmeyer([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
+    evl := PolyEval([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulFunc(x, y, rk)>);
     result1 := Zx!Evaluate(Zft_poly!Zt_poly!poly1, Zft!Zt_poly!m);
     result2 := Zx!Evaluate(Zft_poly!Zt_poly!poly2, Zft!Zt_poly!m);
     _, _, nb_operations := GetBestParameters([poly1, poly2]);
@@ -211,7 +211,7 @@ for degree2 := 1 to 50 do
     // Do the same for lazy relinearization
     poly1 := Zx![Random(1, t) : i in [0..degree1]];
     poly2 := Zx![Random(1, t) : i in [0..degree2]];
-    evl := PatersonStockmeyer([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
+    evl := PolyEval([poly1, poly2], <c, {Z | }>, addFunc, func<x, y | mulLazyFunc(x, y, rk)>:
                               lazy := true, sanitizeFunc := func<x | relinFunc(x, rk)>);
     result1 := Zx!Evaluate(Zft_poly!Zt_poly!poly1, Zft!Zt_poly!m);
     result2 := Zx!Evaluate(Zft_poly!Zt_poly!poly2, Zft!Zt_poly!m);
@@ -220,6 +220,6 @@ for degree2 := 1 to 50 do
               #(evl[1][2] join evl[2][2]) eq nb_operations;
 end for;
 
-"Test Paterson-Stockmeyer multiple polynomials", res1;
-"Test Paterson-Stockmeyer multiple polynomials odd polynomial", res2;
-"Test Paterson-Stockmeyer multiple polynomials lazy relinearization", res3;
+"Test baby-step/giant-step multiple polynomials", res1;
+"Test baby-step/giant-step multiple polynomials odd polynomial", res2;
+"Test baby-step/giant-step multiple polynomials lazy relinearization", res3;

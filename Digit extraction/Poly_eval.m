@@ -1,4 +1,4 @@
-// This file implements the Paterson-Stockmeyer algorithm for evaluating a polynomial of degree at least 1
+// This file implements the baby-step/giant-step algorithm for evaluating a polynomial of degree at least 1
 //--------------------------
 
 // Check if the given input is a sequence of polynomials already
@@ -150,7 +150,7 @@ end function;
 // Preprocessing for polynomial evaluation
 // Evaluate x^spacing using repeated square and multiply
 // Compute updated polynomials accordingly
-function PatersonStockmeyerPreprocessing(element, polynomials, mulFunc, sanitizeFunc)
+function PolyEvalPreprocessing(element, polynomials, mulFunc, sanitizeFunc)
     _, polynomials := IsPolynomialSequence(polynomials);
     spacing := GetSpacing(polynomials);
 
@@ -189,8 +189,8 @@ function PatersonStockmeyerPreprocessing(element, polynomials, mulFunc, sanitize
     return result, polynomials;
 end function;
 
-// Recursive part of Paterson-Stockmeyer algorithm
-function PatersonStockmeyerRecursive(coeff, xExp1, xExp2, addFunc, mulFunc, m, k)
+// Recursive part of baby-step/giant-step algorithm
+function PolyEvalRecursive(coeff, xExp1, xExp2, addFunc, mulFunc, m, k)
     // Base cases
     if #coeff eq 0 then
         return Universe(coeff)!0;
@@ -204,8 +204,8 @@ function PatersonStockmeyerRecursive(coeff, xExp1, xExp2, addFunc, mulFunc, m, k
 
     // Recursive case
     index := Minimum(k * 2 ^ (m - 1), #coeff);      // Index for splitting up sequence
-    rec1 := PatersonStockmeyerRecursive(coeff[1..index], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
-    rec2 := PatersonStockmeyerRecursive(coeff[index + 1..#coeff], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
+    rec1 := PolyEvalRecursive(coeff[1..index], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
+    rec2 := PolyEvalRecursive(coeff[index + 1..#coeff], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
     return addFunc(rec1, mulFunc(rec2, xExp2[m]));
 end function;
 
@@ -216,7 +216,7 @@ end function;
 // - The lazy flag is set to true
 // - An appropriate mulFunc is passed
 // - An appropriate santizer is passed
-function PatersonStockmeyer(polynomials, element, addFunc, mulFunc: lazy := false, sanitizeFunc := func<x | x>)
+function PolyEval(polynomials, element, addFunc, mulFunc: lazy := false, sanitizeFunc := func<x | x>)
     // We should have a list of polynomials
     isSequence, polynomials := IsPolynomialSequence(polynomials);
 
@@ -229,7 +229,7 @@ function PatersonStockmeyer(polynomials, element, addFunc, mulFunc: lazy := fals
 
     // Evaluate x^spacing and update polynomials accordingly
     // Also determine the optimal parameters for the remaining polynomials
-    element, polynomials := PatersonStockmeyerPreprocessing(element, polynomials, mulFunc, sanitizeFunc);
+    element, polynomials := PolyEvalPreprocessing(element, polynomials, mulFunc, sanitizeFunc);
     m, k, _, odd := GetBestParameters(polynomials: lazy := lazy);
 
     // Precompute x ^ exp with exp = 1, ..., k
@@ -273,8 +273,8 @@ function PatersonStockmeyer(polynomials, element, addFunc, mulFunc: lazy := fals
 
     // Return result via sequence of recursive calls
     coeffs := [Eltseq(polynomial) : polynomial in polynomials];
-    result := [sanitizeFunc(addFunc(coeff[1], PatersonStockmeyerRecursive(coeff[2..#coeff], xExp1, xExp2, addFunc,
-                                                                          mulFunc, m, k))) : coeff in coeffs];
+    result := [sanitizeFunc(addFunc(coeff[1], PolyEvalRecursive(coeff[2..#coeff], xExp1, xExp2, addFunc,
+                                                                mulFunc, m, k))) : coeff in coeffs];
 
     // Return single element if the polynomial was given in this format
     if isSequence then

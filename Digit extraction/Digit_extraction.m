@@ -1,5 +1,5 @@
 load "Digit extraction/Arithmetic.m";
-load "Digit extraction/Paterson_Stockmeyer.m";
+load "Digit extraction/Poly_eval.m";
 
 // Return the lifting polynomial with respect to the parameters p and e
 function GetLiftingPolynomial(p, e)
@@ -61,8 +61,7 @@ function HaleviShoupDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_p
     for rowIndex := 0 to v - 1 do
         // Apply lifting polynomial several times to the first element of the row
         for colIndex := 1 to e - rowIndex - 1 do
-            col[rowIndex + 1] := PatersonStockmeyer(liftingPolynomial mod (p ^ (colIndex + 1)), col[rowIndex + 1],
-                                                    addFunc, mulFunc);
+            col[rowIndex + 1] := PolyEval(liftingPolynomial mod (p ^ (colIndex + 1)), col[rowIndex + 1], addFunc, mulFunc);
 
             // Subtract elements on the same diagonal
             if rowIndex + colIndex + 1 le v then
@@ -82,13 +81,12 @@ function ChenHanDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc
     res := u;                   // Result of the digit extraction
     for rowIndex := 0 to v - 1 do
         // Apply the lowest digit retain polynomial
-        rightDigit := PatersonStockmeyer(lowestDigitRetainPolynomials[e - rowIndex], col[rowIndex + 1], addFunc, mulFunc);
+        rightDigit := PolyEval(lowestDigitRetainPolynomials[e - rowIndex], col[rowIndex + 1], addFunc, mulFunc);
         res := div_pFunc(subFunc(res, rightDigit));
         
         // Apply lifting polynomial several times to the first element of the row
         for colIndex := 1 to v - rowIndex - 1 do
-            col[rowIndex + 1] := PatersonStockmeyer(liftingPolynomial mod (p ^ (colIndex + 1)), col[rowIndex + 1],
-                                                    addFunc, mulFunc);
+            col[rowIndex + 1] := PolyEval(liftingPolynomial mod (p ^ (colIndex + 1)), col[rowIndex + 1], addFunc, mulFunc);
 
             // Subtract elements on the same diagonal
             col[rowIndex + colIndex + 1] := div_pFunc(subFunc(col[rowIndex + colIndex + 1], col[rowIndex + 1]));
@@ -98,6 +96,8 @@ function ChenHanDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc
 end function;
 
 // Our digit extraction algorithm
+// This procedure is only briefly mentioned in the paper and discussed in more detail in our
+// work on polynomial functions modulo p^e and faster bootstrapping for homomorphic encryption
 function OurDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc, lowestDigitRetainPolynomials)
     // Populate the triangle with digits
     // Less memory is needed if only one column and the result are stored
@@ -131,8 +131,8 @@ function OurDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc, lo
             Append(~precisions, rowSize);
         end if;
 
-        // Extract digits via Paterson-Stockmeyer
-        digits := PatersonStockmeyer(polynomials, col[rowIndex + 1], addFunc, mulFunc);
+        // Extract digits via baby-step/giant-step
+        digits := PolyEval(polynomials, col[rowIndex + 1], addFunc, mulFunc);
 
         // Determine starting values for next rows based on the necessary precision
         for nextRow := rowIndex + 1 to v - 1 do  // Update next rows with the result from above
