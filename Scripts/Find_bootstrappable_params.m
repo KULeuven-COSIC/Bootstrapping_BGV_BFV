@@ -1,6 +1,7 @@
-load "Crypto/BFV/BFV.m";
+load "Crypto/Hypercube_structure.m";
 
 // Find all bootstrappable parameters in the given range of m
+// It is also possible to restrict the maximum value of the factors of m and d
 m_range := [2^9..2^10];
 d_max := 25;
 m_max := 1000;
