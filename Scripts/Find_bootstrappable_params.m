@@ -1,15 +1,32 @@
 load "Crypto/Hypercube_structure.m";
 
-// Find all bootstrappable parameters in the given range of m
-// It is also possible to restrict the maximum value of the factors of m and d
-m_range := [2^9..2^10];
-d_max := 25;
-m_max := 1000;
+// Find all bootstrappable parameters in a given range
+n_min := 2^15;          // Determines security level (together with ciphertext modulus)
+n_max := 2^16;
+m_max := 2^20;
+d_max := 5;             // Determines number of slots (equal to n / d)
+p_max := 100;           // Determines polynomial degree of digit removal
+m_factor_max := 250;    // Determines complexity of linear transformations
 
-for m in m_range do
-    d := Order(Integers(m)!p);
-    if AreBootstrappableAnyOrder(p, m, PrimeSquareFactorization(m)) and (d_max eq 0 or d le d_max) and
-       (m_max eq 0 or Maximum(PrimeSquareFactorization(m)) le m_max) then
-        "The parameters p =", p, "and m =", m, "are bootstrappable with d =", d;
+// Brute force search to check whether constraints are satisfied
+primes := [p : p in [2..p_max] | IsPrime(p)];
+for m := n_min to m_max do
+    n := EulerPhi(m);
+    if (n lt n_min) or (n gt n_max) then
+        continue;
     end if;
+
+    for p in primes do
+        if GCD(m, p) ne 1 then
+            continue;
+        end if;
+
+        // Check restrictions
+        d := Order(Integers(m)!p);
+        if ((d le d_max) and (Maximum(PrimeSquareFactorization(m)) le m_factor_max)) then
+            //if AreBootstrappableAnyOrder(p, m, PrimeSquareFactorization(m)) then  // Checks HElib bootstrappable requirements
+                "p =", p, "\t  n =", n, "\td =", d, "\t  m =", m, "\t", Factorization(m);
+            //end if;
+        end if;
+    end for;
 end for;
