@@ -66,7 +66,7 @@ end function;
 
 // Convert the given polynomial to single CRT representation
 function PolynomialToSingleCRT(poly: level := #modChain)
-    assert level le #modChain;          // level should not exceed number of primes
+    assert level le #modChain;
     return [Zx | poly mod modulus : modulus in modChain[1..level]];
 end function;
 
