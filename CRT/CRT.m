@@ -66,7 +66,7 @@ end function;
 
 // Convert the given polynomial to single CRT representation
 function PolynomialToSingleCRT(poly: level := #modChain)
-    assert level le #modChain;          // Check that nbModuli in 'Crypto/Params.m' is high enough
+    assert level le #modChain;          // level should not exceed number of primes
     return [Zx | poly mod modulus : modulus in modChain[1..level]];
 end function;
 
@@ -88,7 +88,7 @@ end function;
 
 // Convert the given polynomial to double CRT representation
 function PolynomialToDoubleCRT(poly: level := #modChain)
-    assert level le #modChain;          // Check that nbModuli in 'Crypto/Params.m' is high enough
+    assert level le #modChain;          // level should not exceed number of primes
     return SingleCRTToDoubleCRT(PolynomialToSingleCRT(poly: level := level));
 end function;
 
