@@ -88,7 +88,7 @@ end function;
 
 // Convert the given polynomial to double CRT representation
 function PolynomialToDoubleCRT(poly: level := #modChain)
-    assert level le #modChain;          // level should not exceed number of primes
+    assert level le #modChain;
     return SingleCRTToDoubleCRT(PolynomialToSingleCRT(poly: level := level));
 end function;
 
