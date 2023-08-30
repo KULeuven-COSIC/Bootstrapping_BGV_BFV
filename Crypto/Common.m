@@ -288,7 +288,7 @@ end function;
 
 // Return the slot algebra (the ring structure that is present on the slots)
 function GetSlotAlgebra(henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     Zt := Integers(p ^ henselExponent);
     Zt_poly := PolynomialRing(Zt);
@@ -327,8 +327,8 @@ function InverseCRT(slotRepresentation, henselExponent)
 end function;
 
 // Embed the given sequence of plaintext parts in the plaintext slots
-function EmbedInSlots(parts: henselExponent := r)
-    assert henselExponent le r;
+function EmbedInSlots(parts: henselExponent := e)
+    assert henselExponent le e;
 
     slotRepresentation := [Zx | ];
     for slot := 1 to l do
@@ -344,8 +344,8 @@ function EmbedInSlots(parts: henselExponent := r)
 end function;
 
 // Get the plaintext part at the given (hypercube) index
-function GetFromSlot(plaintext, index: henselExponent := r)
-    assert henselExponent le r;
+function GetFromSlot(plaintext, index: henselExponent := e)
+    assert henselExponent le e;
 
     if Category(index) ne Category(0) then
         index := HypercubeToIndex(index);
@@ -358,8 +358,8 @@ function GetFromSlot(plaintext, index: henselExponent := r)
 end function;
 
 // Get all plaintext parts
-function GetPlaintextParts(plaintext: henselExponent := r)
-    assert henselExponent le r;
+function GetPlaintextParts(plaintext: henselExponent := e)
+    assert henselExponent le e;
 
     return [GetFromSlot(plaintext, index: henselExponent := henselExponent) : index in [1..l]];
 end function;
@@ -382,14 +382,14 @@ end function;
 
 // Compute first 0/1 mask
 function GetMaskAhead(dim, pos, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     return EmbedInSlots(GetMask(dim, pos): henselExponent := henselExponent);
 end function;
 
 // Compute second 0/1 mask
 function GetMaskBack(dim, pos, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     return EmbedInSlots([1 - entry : entry in GetMask(dim, pos)]: henselExponent := henselExponent);
 end function;
@@ -410,14 +410,14 @@ end function;
 
 // Compute first adapted 0/1 mask
 function GetAdaptedMaskAhead(dim, pos, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     return EmbedInSlots(GetAdaptedMask(dim, pos): henselExponent := henselExponent);
 end function;
 
 // Compute second adapted 0/1 mask
 function GetAdaptedMaskBack(dim, pos, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     return EmbedInSlots([1 - entry : entry in GetAdaptedMask(dim, pos)]: henselExponent := henselExponent);
 end function;
@@ -466,8 +466,8 @@ function ApplyAutomorphismCiphertext(c, exp_hyperIndex, switchKey)
 end function;
 
 // Apply an automorphism to the given plaintext based on the given exponent or hypercube index
-function ApplyAutomorphismPlaintext(m, exp_hyperIndex: henselExponent := r)
-    assert henselExponent le r;
+function ApplyAutomorphismPlaintext(m, exp_hyperIndex: henselExponent := e)
+    assert henselExponent le e;
 
     return ApplyAutomorphism(m, p ^ henselExponent, exp_hyperIndex);
 end function;
@@ -486,8 +486,8 @@ function ApplyFrobeniusPowerCiphertext(c, exp, switchKey)
 end function;
 
 // Apply the exp'th power of the Frobenius map, i.e. x -> x ^ (p ^ exp), to the given plaintext
-function ApplyFrobeniusPowerPlaintext(element, exp: henselExponent := r)
-    assert henselExponent le r;
+function ApplyFrobeniusPowerPlaintext(element, exp: henselExponent := e)
+    assert henselExponent le e;
 
     return ApplyAutomorphismPlaintext(element, Modexp(p, exp, m): henselExponent := henselExponent);
 end function;
@@ -529,8 +529,8 @@ end function;
 // Rotate the plaintext slots of the given plaintext with pos positions
 // The dimension dim can take the values 1, ..., GetNbDimensions().
 // The variable pos can take the values 0, ..., GetDimensionSize(dim) - 1.
-function RotateSlotsPlaintext(m, dim, pos: henselExponent := r)
-    assert henselExponent le r;
+function RotateSlotsPlaintext(m, dim, pos: henselExponent := e)
+    assert henselExponent le e;
 
     if IsGoodDimension(dim) then
         // Compute hypercube index and apply automorphism

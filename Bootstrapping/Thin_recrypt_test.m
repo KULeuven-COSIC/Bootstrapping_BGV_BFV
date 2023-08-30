@@ -13,19 +13,17 @@ sk, pk := GenKeyPair();
 
 // Switch to lowest modulus before bootstrapping
 // --> Not possible to go to extremely low modulus, because of linear maps
-henselExponentPlaintext := 1;
-henselExponentCiphertext := 8;
-msq := EmbedInSlots([Random(p ^ henselExponentPlaintext - 1) : i in [1..l]]: henselExponent := henselExponentPlaintext);
+msq := EmbedInSlots([Random(p ^ r - 1) : i in [1..l]]: henselExponent := r);
 if scheme eq "BFV" then
-    csq := ModSwitch(Encrypt(msq, p ^ henselExponentPlaintext, pk), 2 ^ 100);                                         // BFV
+    csq := ModSwitch(Encrypt(msq, p ^ r, pk), 2 ^ 100);                                         // BFV
 else
-    csq := ModSwitch(Encrypt(msq, p ^ henselExponentPlaintext, pk), baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
+    csq := ModSwitch(Encrypt(msq, p ^ r, pk), baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
 end if;
 
 
 
 // Bootstrapping variables
-recrypt_variables := GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext);
+recrypt_variables := GenerateThinRecryptVariables(sk, pk, r, e);
 
 // Test recryption
 t := Cputime();

@@ -31,7 +31,7 @@ c := Encrypt(m, t, pk);
 
 // Test linear transformation
 constants := [RandPol(t) : i in [1..d]];
-adapted_constants := MatMulSlotsAdaptedConstants(constants, r);
+adapted_constants := MatMulSlotsAdaptedConstants(constants, e);
 
 // Apply linear transformation
 res := GetPlaintextParts(Decrypt(MatMulSlotsBabyGiant(c, adapted_constants, frobeniusSwitchKeys), sk));

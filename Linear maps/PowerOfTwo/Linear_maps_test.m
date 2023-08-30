@@ -4,7 +4,7 @@ load "Linear maps/PowerOfTwo/Linear_maps.m";
 assert usePowerOfTwo;
 
 // Compute ring structure present on the slots
-Zt_F1<y> := GetSlotAlgebra(r);
+Zt_F1<y> := GetSlotAlgebra(e);
 
 sk, pk := GenKeyPair();
 
@@ -12,7 +12,7 @@ sk, pk := GenKeyPair();
 m := EmbedInSlots([Random(t - 1) : ind in [1..l]]);
 c := Encrypt(m, t, pk);
 
-adapted_constants := MatMulAdaptedConstants(SparseConstants(r), r);
+adapted_constants := MatMulAdaptedConstants(SparseConstants(e), e);
 switchKeys := [];
 for pos := 2 to l do
     Append(~switchKeys, GenSwitchKey(sk, IndexToHypercube(pos)));
@@ -25,6 +25,6 @@ for index := 1 to n do
         result := false;
     end if;
 end for;
-adapted_constants := MatMulAdaptedConstants(SparseInvConstants(r), r);
+adapted_constants := MatMulAdaptedConstants(SparseInvConstants(e), e);
 cNew := MatMulBabyGiant(cNew, adapted_constants, switchKeys);
 "Test sparse linear transformation", result and ((d * Decrypt(cNew, sk)) mod t) eq Decrypt(c, sk);

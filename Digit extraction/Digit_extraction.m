@@ -11,7 +11,7 @@ function GetLiftingPolynomial(p, e)
     
     // Return the lifting polynomial
     poly := (x ^ p - &+[polynomials[i] * (p ^ i) : i in [1..e]]) mod (p ^ (e + 1));
-    return (Evaluate(poly, x + (p div 2)) - (p div 2)) mod (p ^ (e + 1));
+    return (Evaluate(poly, x + ((p - 1) div 2)) - ((p - 1) div 2)) mod (p ^ (e + 1));
 end function;
 
 // Return the lowest digit removal polynomial with respect to the parameters p and e
@@ -33,7 +33,7 @@ function GetLowestDigitRemovalPolynomial(p, e)
         factor := taylor[m + 1] / Factorial(m);
         poly +:= &*[x - i : i in [0..m - 1]] * Numerator(factor) * Modinv(Denominator(factor), p ^ e);
     end for;
-    return poly mod (p ^ e);
+    return Evaluate(poly, x + ((p - 1) div 2)) mod (p ^ e);
 end function;
 
 // Return the lowest digit retain polynomial with respect to the parameters p and e
@@ -41,10 +41,8 @@ function GetLowestDigitRetainPolynomial(p, e)
     // Make sure to use balanced digits for odd p
     e_new := (p eq 2) select e + 1 else e;
     poly := (x - GetLowestDigitRemovalPolynomial(p, e_new)) mod (p ^ e_new);
-    if p ne 2 then
-        poly := (Evaluate(poly, x + (p div 2)) - (p div 2)) mod (p ^ e);
-    end if;
     
+    // Make sure that the polynomials have only even or odd coefficients
     if p eq 2 then
         return ((poly + Evaluate(poly, -x)) div 2) mod (p ^ e);
     else

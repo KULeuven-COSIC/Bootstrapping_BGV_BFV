@@ -20,7 +20,7 @@ end function;
 // Invert the given matrix over the slot algebra
 // The entries of the matrix should be elements of Zx
 function InvertMatrixOverSlotAlgebra(matrix, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     // First invert the matrix over a finite field
     Fp_ext := ext<GF(p) | GetFirstSlotFactor()>;
@@ -46,7 +46,7 @@ end function;
 // Both A and b must be specified as matrices over Zx
 // It is allowed that b is a full matrix instead of a column matrix
 function SolveSystem(A, b, henselExponent)
-    assert henselExponent le r;
+    assert henselExponent le e;
 
     // Trivial implementation: multiply inverse of A with b
     inverse := InvertMatrixOverSlotAlgebra(A, henselExponent);

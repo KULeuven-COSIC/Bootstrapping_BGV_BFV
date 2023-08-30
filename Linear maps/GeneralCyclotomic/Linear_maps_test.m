@@ -2,7 +2,7 @@ load "Crypto/BFV/BFV.m";
 load "Linear maps/GeneralCyclotomic/Linear_maps.m";
 
 // Compute ring structure present on the slots
-Zt_F1<y> := GetSlotAlgebra(r);
+Zt_F1<y> := GetSlotAlgebra(e);
 
 sk, pk := GenKeyPair();
 
@@ -20,9 +20,9 @@ m := EmbedInSlots([Zx | i eq 1 select GetNormalElement() else 0 : i in [1..l]]);
 c := Encrypt(m, t, pk);
 
 dim := 1;
-constants := EvalStage_1Constants(1, r);
-adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+constants := EvalStage_1Constants(1, e);
+adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys
 rotationSwitchKeysAhead := [];
@@ -63,9 +63,9 @@ end if;
 // Compute linear transformation in each dimension except for the first one
 for dim := 2 to GetNbDimensions() do
     dim_size := GetDimensionSize(dim);
-    constants := EvalStage_dimConstants(dim, r);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+    constants := EvalStage_dimConstants(dim, e);
+    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
     // Generate switch keys
     switchKeysAhead := [];
@@ -99,9 +99,9 @@ m := RandPol(t);
 c := Encrypt(m, t, pk);
 for dim := 1 to GetNbDimensions() do
     // Eval transformation
-    constants := EvalStage_dimConstants(dim, r);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+    constants := EvalStage_dimConstants(dim, e);
+    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
     // Generate switch keys
     switchKeysAhead := [];
@@ -125,9 +125,9 @@ for dim := 1 to GetNbDimensions() do
 
 
     // Inverse Eval transformation
-    constants := EvalInvStage_dimConstants(dim, r);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+    constants := EvalInvStage_dimConstants(dim, e);
+    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
     // Good vs bad dimension
     if IsGoodDimension(dim) then
@@ -149,9 +149,9 @@ m := RandPol(t);
 c := Encrypt(m, t, pk);
 
 // Eval transformation
-constants := EvalStage_1Constants(1, r);
-adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+constants := EvalStage_1Constants(1, e);
+adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys
 rotationSwitchKeysAhead := [];
@@ -175,9 +175,9 @@ end if;
 
 
 // Inverse Eval transformation
-constants := EvalInvStage_1Constants(1, r);
-adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+constants := EvalInvStage_1Constants(1, e);
+adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
 // Good vs bad dimension
 if IsGoodDimension(dim) then
@@ -193,9 +193,9 @@ res := Decrypt(c, sk);
 
 
 // Test unpacking the plaintext slots
-constants := UnpackConstants(r);
-adapted_constants := MatMulSlotsAdaptedConstants(constants, r);
-repackConstants := RepackConstants(r);
+constants := UnpackConstants(e);
+adapted_constants := MatMulSlotsAdaptedConstants(constants, e);
+repackConstants := RepackConstants(e);
 
 // Create plaintext and ciphertext
 m := EmbedInSlots([Zx | i eq 1 select GetNormalElement() else Evaluate(GetNormalElement(),

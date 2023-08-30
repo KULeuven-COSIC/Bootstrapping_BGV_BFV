@@ -42,8 +42,8 @@ c := Encrypt(m, t, pk);
 for dim := 1 to GetNbDimensions() do
     dim_size := GetDimensionSize(dim);
     constants := [RandPol(t) : i in [1..d * dim_size]];
-    adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, r);
-    adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, r);
+    adapted_constants := BlockMatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+    adapted_constantsAhead, adapted_constantsBack := BlockMatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
     // Generate switch keys
     rotationSwitchKeysAhead := [];

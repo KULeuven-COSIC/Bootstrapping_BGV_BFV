@@ -11,22 +11,16 @@ sk, pk := GenKeyPair();
 
 
 
-// Test which modulus is the lowest possible to switch to
-henselExponentPlaintext := 1;
-henselExponentCiphertext := 8;
-
-
-
 // Message to recrypt
-msq := RandPol(p ^ henselExponentPlaintext);
+msq := RandPol(p ^ r);
 if scheme eq "BFV" then
-    csq := ModSwitch(Encrypt(msq, p ^ henselExponentPlaintext, pk), 2 ^ 100);                                         // BFV
+    csq := ModSwitch(Encrypt(msq, p ^ r, pk), 2 ^ 100);                                         // BFV
 else
-    csq := ModSwitch(Encrypt(msq, p ^ henselExponentPlaintext, pk), baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
+    csq := ModSwitch(Encrypt(msq, p ^ r, pk), baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
 end if;
 
 // Bootstrapping info
-recrypt_variables := GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext);
+recrypt_variables := GenerateRecryptVariables(sk, pk, r, e);
 
 // Test recryption
 t := Cputime();

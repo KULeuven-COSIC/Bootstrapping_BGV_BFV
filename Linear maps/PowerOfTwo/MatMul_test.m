@@ -30,7 +30,7 @@ c := Encrypt(m, t, pk);
 // Test linear transformation
 dim_sizes := [GetDimensionSize(dim) : dim in [1..GetNbDimensions()]];
 constants := [EmbedInSlots([Random(t - 1) : i in [1..l]]) : j in [1..l]];
-adapted_constants := MatMulAdaptedConstants(constants, r);
+adapted_constants := MatMulAdaptedConstants(constants, e);
 
 // Generate switch keys
 switchKeys := [];

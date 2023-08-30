@@ -6,8 +6,9 @@ q := 2^300;                           // Ciphertext modulus
 m := 2^10 - 1;                        // m-th cyclotomic polynomial
 n := EulerPhi(m);                     // Degree of f(x)
 p := 2;                               // Plaintext prime modulus
-r := 8;                               // Hensel lifting factor
-t := p^r;                             // Plaintext modulus
+r := 1;                               // Original Hensel lifting factor
+e := 8;                               // Extended Hensel lifting factor during bootstrapping
+t := p^e;                             // Plaintext modulus during bootstrapping
 h := 120;                             // Hamming weight secret keys, ternary {0, -/+1}
 errorB := 20;                         // Binomial sampling on [-errorB, errorB] with sigma = Sqrt(errorB/2)
 L := 5;                               // Number of pieces when splitting
