@@ -84,7 +84,9 @@ end function;
 // Perform modulus switching for efficiency reasons
 // --> Just make sure that the noise is always above the relin level
 procedure DynamicModSwitch(~cp)
-    AutomaticModSwitchRelin(~cp);
+    if enableModSwitch then
+        AutomaticModSwitchRelin(~cp);
+    end if;
 end procedure;
 
 // Automatic mod switch before multiplication
@@ -94,14 +96,16 @@ end procedure;
 
 // Automatic mod switch before relinearization
 procedure AutomaticModSwitchRelin(~cp)
-    if Sqrt(cp[4]) gt 0 then
-        // Estimate roughly the size of the new modulus
-        mod_size := cp[3] * noiseLevelRelin / Sqrt(cp[4]);
-        newMod := baseModulus ^ Maximum(Ceiling(Log(baseModulus, mod_size / q_double_prime)), 0) * q_double_prime;
+    if enableModSwitch then
+        if Sqrt(cp[4]) gt 0 then
+            // Estimate roughly the size of the new modulus
+            mod_size := cp[3] * noiseLevelRelin / Sqrt(cp[4]);
+            newMod := baseModulus ^ Maximum(Ceiling(Log(baseModulus, mod_size / q_double_prime)), 0) * q_double_prime;
 
-        // Perform actual mod switch
-        if newMod ne cp[3] then
-            cp := ModSwitch(cp, Minimum(Maximum(newMod, q_double_prime), GetDefaultModulus()));
+            // Perform actual mod switch
+            if newMod ne cp[3] then
+                cp := ModSwitch(cp, Minimum(Maximum(newMod, q_double_prime), GetDefaultModulus()));
+            end if;
         end if;
     end if;
 end procedure;
