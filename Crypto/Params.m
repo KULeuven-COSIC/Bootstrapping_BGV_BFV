@@ -38,7 +38,7 @@ can_max := 900;                   // To be determined experimentally from "Scrip
 expansion_automorphism := 2^10;   // The maximum growth of the norm when an automorphism is applied to an element
 
 // Constants for determining the modulus chain and modulus switching details
-enableModSwitch := false;         // Only for the BFV scheme
+enableModSwitch := true;          // Only for the BFV scheme
 modPrecision := 2^5;              // Determines the precision of the modulus (how close it is to its optimal value)
 noiseLevelMul := 2^5;             // Magnitude of the noise before multiplication (cannot be too high to prevent decryption errors)
 noiseLevelRelin := 2^5 * t * w * Sqrt((n / 12) * L * (errorB * n / 2)); // Magnitude of the noise before key switching
