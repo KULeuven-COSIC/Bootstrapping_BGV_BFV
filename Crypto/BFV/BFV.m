@@ -1,5 +1,4 @@
 // BFV - Magma implementation
-// Code based upon an earlier version written by Frederik Vercauteren
 //--------------------------
 load "Crypto/Common.m";
 scheme := "BFV";

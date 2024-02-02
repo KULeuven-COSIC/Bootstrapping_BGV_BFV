@@ -60,86 +60,88 @@ else
                                             rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys);
 end if;
 
-// Compute linear transformation in each dimension except for the first one
-for dim := 2 to GetNbDimensions() do
-    dim_size := GetDimensionSize(dim);
-    constants := EvalStage_dimConstants(dim, e);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
+if GetNbDimensions() eq #factors_m then
+    // Compute linear transformation in each dimension except for the first one
+    for dim := 2 to GetNbDimensions() do
+        dim_size := GetDimensionSize(dim);
+        constants := EvalStage_dimConstants(dim, e);
+        adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
-    // Generate switch keys
-    switchKeysAhead := [];
-    for pos := 1 to GetDimensionSize(dim) - 1 do
-        Append(~switchKeysAhead, GenSwitchKey(sk, Get1DHyperIndex(dim, pos)));
+        // Generate switch keys
+        switchKeysAhead := [];
+        for pos := 1 to GetDimensionSize(dim) - 1 do
+            Append(~switchKeysAhead, GenSwitchKey(sk, Get1DHyperIndex(dim, pos)));
+        end for;
+        switchKeysBack := [];
+        for pos := 1 to GetDimensionSize(dim) - 1 do
+            Append(~switchKeysBack, GenSwitchKey(sk, Get1DHyperIndex(dim, pos - GetDimensionSize(dim))));
+        end for;
+        switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dim, -GetDimensionSize(dim)));
+
+        // Good vs bad dimension
+        if IsGoodDimension(dim) then
+            c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
+        else
+            c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
+                                            switchKeysAhead, switchKeyMinusD);
+        end if;
     end for;
-    switchKeysBack := [];
-    for pos := 1 to GetDimensionSize(dim) - 1 do
-        Append(~switchKeysBack, GenSwitchKey(sk, Get1DHyperIndex(dim, pos - GetDimensionSize(dim))));
+    Zxi := PolynomialRing(Z, #factors_m);
+    res := Zxi!PolynomialToPowerfulBasis(Decrypt(c, sk), factors_m);
+    mod_reduction := quo<Zxi | t>;
+    res := Coefficients(Zxi!mod_reduction!res);
+    "Test all stages of linear maps", (#res eq 1) and ((res[1] mod t) eq 1);
+
+
+
+    // Test inverse linear transformation
+    m := RandPol(t);
+    c := Encrypt(m, t, pk);
+    for dim := 1 to GetNbDimensions() do
+        // Eval transformation
+        constants := EvalStage_dimConstants(dim, e);
+        adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
+
+        // Generate switch keys
+        switchKeysAhead := [];
+        for pos := 1 to GetDimensionSize(dim) - 1 do
+            Append(~switchKeysAhead, GenSwitchKey(sk, Get1DHyperIndex(dim, pos)));
+        end for;
+        switchKeysBack := [];
+        for pos := 1 to GetDimensionSize(dim) - 1 do
+            Append(~switchKeysBack, GenSwitchKey(sk, Get1DHyperIndex(dim, pos - GetDimensionSize(dim))));
+        end for;
+        switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dim, -GetDimensionSize(dim)));
+
+        // Good vs bad dimension
+        if IsGoodDimension(dim) then
+            c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
+        else
+            c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
+                                            switchKeysAhead, switchKeyMinusD);
+        end if;
+
+
+
+        // Inverse Eval transformation
+        constants := EvalInvStage_dimConstants(dim, e);
+        adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
+
+        // Good vs bad dimension
+        if IsGoodDimension(dim) then
+            c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
+        else
+            c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
+                                            switchKeysAhead, switchKeyMinusD);
+        end if;
+        res := Decrypt(c, sk);
+
+        "Test inverse linear map in dimension", dim, res eq m;
     end for;
-    switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dim, -GetDimensionSize(dim)));
-
-    // Good vs bad dimension
-    if IsGoodDimension(dim) then
-        c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
-    else
-        c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
-                                           switchKeysAhead, switchKeyMinusD);
-    end if;
-end for;
-Zxi := PolynomialRing(Z, #factors_m);
-res := Zxi!PolynomialToPowerfulBasis(Decrypt(c, sk), factors_m);
-mod_reduction := quo<Zxi | t>;
-res := Coefficients(Zxi!mod_reduction!res);
-"Test all stages of linear maps", (#res eq 1) and ((res[1] mod t) eq 1);
-
-
-
-// Test inverse linear transformation
-m := RandPol(t);
-c := Encrypt(m, t, pk);
-for dim := 1 to GetNbDimensions() do
-    // Eval transformation
-    constants := EvalStage_dimConstants(dim, e);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
-
-    // Generate switch keys
-    switchKeysAhead := [];
-    for pos := 1 to GetDimensionSize(dim) - 1 do
-        Append(~switchKeysAhead, GenSwitchKey(sk, Get1DHyperIndex(dim, pos)));
-    end for;
-    switchKeysBack := [];
-    for pos := 1 to GetDimensionSize(dim) - 1 do
-        Append(~switchKeysBack, GenSwitchKey(sk, Get1DHyperIndex(dim, pos - GetDimensionSize(dim))));
-    end for;
-    switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dim, -GetDimensionSize(dim)));
-
-    // Good vs bad dimension
-    if IsGoodDimension(dim) then
-        c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
-    else
-        c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
-                                           switchKeysAhead, switchKeyMinusD);
-    end if;
-
-
-
-    // Inverse Eval transformation
-    constants := EvalInvStage_dimConstants(dim, e);
-    adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
-    adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
-
-    // Good vs bad dimension
-    if IsGoodDimension(dim) then
-        c := MatMul1DGoodDimensionBabyGiant(c, adapted_constants, dim, switchKeysAhead);
-    else
-        c := MatMul1DBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_constantsBack, dim,
-                                           switchKeysAhead, switchKeyMinusD);
-    end if;
-    res := Decrypt(c, sk);
-
-    "Test inverse linear map in dimension", dim, res eq m;
-end for;
+end if;
 
 
 

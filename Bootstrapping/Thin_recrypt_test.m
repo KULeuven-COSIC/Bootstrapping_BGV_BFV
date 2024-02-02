@@ -5,8 +5,6 @@ load "Crypto/BFV/BFV.m";
 // Load recryption functionality
 load "Bootstrapping/Thin_recrypt.m";
 
-assert usePowerOfTwo or AreBootstrappable(p, m, factors_m);
-
 sk, pk := GenKeyPair();
 
 

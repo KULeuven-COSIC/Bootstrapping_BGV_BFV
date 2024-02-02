@@ -2,12 +2,39 @@
 //--------------------------
 load "CRT/CRT.m";
 
+// Make sure that we have a valid factorization for the powerful basis ring
+factors_m := factors_m eq [] select PrimeSquareFactorization(m) else factors_m;
+assert IsCoprimeFactorization(m, factors_m);
+assert not usePowerOfTwo or IsPowerOfTwo(m);
+
+// Function that decides which version of the linear transformations will be used for thin bootstrapping
+// - Return value 1: HElib version
+// - Return value 2: SEAL version
+// - Return value 3: our version
+// - Return value 0: building (bootstrappable) hypercube is not possible
+forward AreBootstrappableAnyOrder;
+function GetLTVersion()
+    if (GCD(m, p) ne 1) or (not IsPrime(p)) then
+        return 0;                       // No hypercube possible
+    elif not usePowerOfTwo then                     
+        if AreBootstrappableAnyOrder(p, m, factors_m) then
+            return 1;                   // HElib hypercube
+        else
+            return 0;                   // No bootstrappable hypercube possible
+        end if;
+    elif mat_dimensions eq [] then
+        return 2;                       // SEAL hypercube
+    else
+        return 3;                       // Our hypercube
+    end if;
+end function;
+
 // Get a set S of representatives of (Z/mZ)*/<p>
-// Also return the orders of the elements s_i of S in (Z/mZ)* and in (Z/mZ)*/<p, s_1, ..., s_i-1>
+// Also return the orders of the elements s_i of S in (Z/mZ)* and in (Z/mZ)*/<p, s_1, ..., s_{i-1}>
 // Note: this function cannot be used for creating a bootstrappable hypercube structure
 function GetHypercubeStructure(p, m)
     S := [];            // Representatives of the group (Z/mZ)*/<p>
-    orders := [];       // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_i-1>
+    orders := [];       // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_{i-1}>
 
     // Current quotient group
     Zm := Integers(m);
@@ -50,7 +77,7 @@ end function;
 // Check whether the given parameters are bootstrappable
 function AreBootstrappable(p, m, factors_m)
     // Only valid if there are slots
-    if GCD(m, p) ne 1 then
+    if (GCD(m, p) ne 1) or (not IsPrime(p)) then
         return false;
     end if;
 
@@ -89,14 +116,14 @@ function AreBootstrappableAnyOrder(p, m, factors_m)
 end function;
 
 // Compute the hypercube structure based on the given parameters that are bootstrappable
-function GetBootstrappableHypercubeStructure(p, m, factors_m)
+function GetHElibHypercubeStructure(p, m, factors_m)
     // Compute degree d of irreducible factors
     Zm := Integers(m);
     d := Order(Zm!p);
 
     // Compute elements of S
     S := [];                // Representatives of the group (Z/mZ)*/<p>
-    orders := [];           // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_i-1>
+    orders := [];           // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_{i-1}>
     d_prod := 1;            // Current product of factors of d
     for index := 1 to #factors_m do
         // Compute parameters for quotient group
@@ -118,9 +145,9 @@ function GetBootstrappableHypercubeStructure(p, m, factors_m)
 end function;
 
 // Compute a hypercube structure that can be used for bootstrapping power-of-two cyclotomics
-function GetPowerOfTwoHypercubeStructure(p, m)
+function GetSEALHypercubeStructure(p, m)
     S := [];            // Representatives of the group (Z/mZ)*/<p>
-    orders := [];       // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_i-1>
+    orders := [];       // Sequence of <n1, n2> with n1 the order in (Z/mZ)* and n2 the order in (Z/mZ)*/<p, s_1, ..., s_{i-1}>
 
     // Current quotient group
     Zm := Integers(m);
@@ -172,25 +199,48 @@ function GetPowerOfTwoHypercubeStructure(p, m)
     return S, orders;
 end function;
 
+// Compute a hypercube structure that can be used for bootstrapping power-of-two cyclotomics
+// The variable mat_dimensions indicates the dimensions of the FFT-like matrices
+function GetOurHypercubeStructure(p, m, mat_dimensions)
+    // Product of matrix dimensions should be equal to number of slots
+    assert &*mat_dimensions eq m div (2 * Order(Integers(m)!p));
+
+    // Half of first matrix dimension is used by representative -1
+    if p mod 4 eq 1 then
+        if mat_dimensions[1] lt 2 then
+            error "To facilitate the implementation, the first matrix dimension must greater than 1.";
+        end if;
+        mat_dimensions[1] div:= 2;
+    end if;
+
+    // Generators that are powers of 5
+    S := [(5 ^ (&*mat_dimensions[1..index - 1])) mod m : index in [1..#mat_dimensions]];
+    orders := [<m div (4 * (&*mat_dimensions[1..index - 1])), mat_dimensions[index]> : index in [1..#mat_dimensions]];
+
+    // Optionally add generator -1
+    if p mod 4 eq 1 then
+        return S cat [-1], orders cat [<2, 2>];
+    else
+        return S, orders;
+    end if;
+end function;
 
 
-// Make sure that we have a valid factorization for the powerful basis ring
-factors_m := factors_m eq [] select PrimeSquareFactorization(m) else factors_m;
-assert IsCoprimeFactorization(m, factors_m);
 
 // Only build hypercube structure if it is possible to do so
-if GCD(m, p) eq 1 then
+if (GCD(m, p) eq 1) and IsPrime(p) then
     // Info for plaintext space and slots
     d := Order(Zm!p); l := n div d;
 
     // Build special hypercube structure depending on the parameters
-    if usePowerOfTwo then
-        assert IsPowerOfTwo(m);
-        S, orders := GetPowerOfTwoHypercubeStructure(p, m);
-    elif AreBootstrappableAnyOrder(p, m, factors_m) then
+    if GetLTVersion() eq 1 then
         _, factors_m := AreBootstrappableAnyOrder(p, m, factors_m);
-        S, orders := GetBootstrappableHypercubeStructure(p, m, factors_m);
-    else
+        S, orders := GetHElibHypercubeStructure(p, m, factors_m);
+    elif GetLTVersion() eq 2 then
+        S, orders := GetSEALHypercubeStructure(p, m);
+    elif GetLTVersion() eq 3 then
+        S, orders := GetOurHypercubeStructure(p, m, mat_dimensions);
+    elif GetLTVersion() eq 0 then
         S, orders := GetHypercubeStructure(p, m);
         "Warning: hypercube structure is not bootstrappable.";
     end if;

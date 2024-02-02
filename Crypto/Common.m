@@ -197,7 +197,7 @@ end function;
 
 
 // The code from here on is only executed if there is a valid hypercube structure
-if GCD(m, p) eq 1 then
+if (GCD(m, p) eq 1) and IsPrime(p) then
 
 // Return the number of dimensions
 function GetNbDimensions()
@@ -526,24 +526,44 @@ function RotateSlotsBadDimension(c, dim, pos, switchKeyAhead, switchKeyBack)
     return Add(cAhead, cBack);
 end function;
 
+// Rotate the plaintext slots of the given ciphertext with the given exponent
+// One bad dimension (and corresponding number of positions) may be specified
+function RotateSlotsGeneral(c, exp, bad_dimension, bad_positions, switchKeyAhead, switchKeyBack)
+    // Embed mask entries into slots
+    maskAhead := GetMaskAhead(bad_dimension, bad_positions, GetHenselExponent(c));
+    maskBack := GetMaskBack(bad_dimension, bad_positions, GetHenselExponent(c));
+
+    // Apply masks to ciphertext in order to prevent leaking to other hypercolumns
+    cAhead := MulConstant(c, maskAhead);
+    cBack := MulConstant(c, maskBack);
+
+    // Apply automorphisms
+    backwards_factor := GetHypercubeRepresentative([index eq bad_dimension select GetDimensionSize(bad_dimension) else 0 :
+                                                    index in [1..GetNbDimensions()]]);
+    cAhead := ApplyAutomorphismCiphertext(cAhead, exp, switchKeyAhead);
+    cBack := ApplyAutomorphismCiphertext(cBack, (exp * backwards_factor) mod m, switchKeyBack);
+
+    return Add(cAhead, cBack);
+end function;
+
 // Rotate the plaintext slots of the given plaintext with pos positions
 // The dimension dim can take the values 1, ..., GetNbDimensions().
 // The variable pos can take the values 0, ..., GetDimensionSize(dim) - 1.
-function RotateSlotsPlaintext(m, dim, pos: henselExponent := e)
+function RotateSlotsPlaintext(ptxt, dim, pos: henselExponent := e)
     assert henselExponent le e;
 
     if IsGoodDimension(dim) then
         // Compute hypercube index and apply automorphism
         hyperIndex := Get1DHyperIndex(dim, pos);
-        return ApplyAutomorphismPlaintext(m, hyperIndex: henselExponent := henselExponent);
+        return ApplyAutomorphismPlaintext(ptxt, hyperIndex: henselExponent := henselExponent);
     else
         // Embed mask entries into slots
         maskAhead := GetMaskAhead(dim, pos, henselExponent);
         maskBack := GetMaskBack(dim, pos, henselExponent);
 
         // Apply masks to plaintext in order to prevent leaking to other hypercolumns
-        mAhead := ((m * maskAhead) mod f) mod (p ^ henselExponent);
-        mBack := ((m * maskBack) mod f) mod (p ^ henselExponent);
+        mAhead := ((ptxt * maskAhead) mod f) mod (p ^ henselExponent);
+        mBack := ((ptxt * maskBack) mod f) mod (p ^ henselExponent);
 
         // Compute hypercube indices for automorphisms
         hyperIndexAhead := Get1DHyperIndex(dim, pos);
@@ -555,6 +575,26 @@ function RotateSlotsPlaintext(m, dim, pos: henselExponent := e)
 
         return (mAhead + mBack) mod (p ^ henselExponent);
     end if;
+end function;
+
+// Rotate the plaintext slots of the given plaintext with the given exponent
+// One bad dimension (and corresponding number of positions) may be specified
+function RotateSlotsGeneralPlaintext(ptxt, exp, bad_dimension, bad_positions: henselExponent := e)
+    // Embed mask entries into slots
+    maskAhead := GetMaskAhead(bad_dimension, bad_positions, henselExponent);
+    maskBack := GetMaskBack(bad_dimension, bad_positions, henselExponent);
+
+    // Apply masks to plaintext in order to prevent leaking to other hypercolumns
+    mAhead := ((ptxt * maskAhead) mod f) mod (p ^ henselExponent);
+    mBack := ((ptxt * maskBack) mod f) mod (p ^ henselExponent);
+
+    // Apply automorphisms
+    backwards_factor := GetHypercubeRepresentative([index eq bad_dimension select GetDimensionSize(bad_dimension) else 0 :
+                                                    index in [1..GetNbDimensions()]]);
+    mAhead := ApplyAutomorphismPlaintext(mAhead, exp: henselExponent := henselExponent);
+    mBack := ApplyAutomorphismPlaintext(mBack, (exp * backwards_factor) mod m: henselExponent := henselExponent);
+
+    return (mAhead + mBack) mod (p ^ henselExponent);
 end function;
 
 end if;

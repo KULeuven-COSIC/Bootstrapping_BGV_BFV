@@ -143,3 +143,13 @@ function IsPowerOfTwo(m)
     result, p, r := IsPrimePower(m);
     return result and (p eq 2);
 end function;
+
+// Find index of element in list
+function Find(list, element)
+    for index := 1 to #list do
+        if list[index] eq element then
+            return index;
+        end if;
+    end for;
+    return 0;
+end function;

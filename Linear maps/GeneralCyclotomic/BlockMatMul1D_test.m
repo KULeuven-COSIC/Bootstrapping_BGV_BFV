@@ -2,12 +2,16 @@ load "Crypto/BFV/BFV.m";
 load "Linear maps/GeneralCyclotomic/Linear_maps.m";
 
 // Test if conversion works
+result := true;
 for dim := 1 to GetNbDimensions() do
     for index := 1 to d * GetDimensionSize(dim) do
         i, j := IndexToIJ(index, dim);
-        assert IJToIndex(i, j, dim) eq index;
+        if IJToIndex(i, j, dim) ne index then
+            result := false;
+        end if;
     end for;
 end for;
+"Test conversion between regular index and two-dimensional index", result;
 
 // Simulate functionality on plaintext
 function SimulateBlockMatMul1D(m, dim, constants)

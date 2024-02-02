@@ -52,3 +52,51 @@ function SolveSystem(A, b, henselExponent)
     inverse := InvertMatrixOverSlotAlgebra(A, henselExponent);
     return [el mod GetFirstSlotFactor() mod (p ^ henselExponent) : el in Eltseq(Transpose(inverse * b))];
 end function;
+
+
+
+// Compute the constants for a Zpr-linear map on E based on d linear independent input-output pairs
+// The function returns a sequence c such that the map is given by theta -> c[1] * theta + ... + c[d] * sigma^(d - 1)(theta)
+// where sigma denotes the Frobenius map
+// It is allowed to pass multiple outputs by chaining all elements in one sequence (the result will then be chained as well)
+function GetMapConstants(inputs, outputs, henselExponent)
+    // Solve a system of linear equations to determine the map
+    Zt_F1<y> := GetSlotAlgebra(henselExponent);
+    matrix := &cat[[Evaluate(inputs[equation], y ^ Modexp(p, i, m)) : i in [0..d - 1]] : equation in [1..d]];
+    return SolveSystem(Matrix(Zx, d, d, matrix), Transpose(Matrix(Zx, #outputs div d, d, outputs)), henselExponent);
+end function;
+
+// Convert the given constants for a Zpr-linear map on E to a matrix
+// The matrix is with respect to the standard basis 1, x, ..., x ^ (d - 1)
+function MapToMatrix(constants, henselExponent)
+    Zt := Integers(p ^ henselExponent);
+    Zt_F1<y> := GetSlotAlgebra(henselExponent);
+
+    // Evaluate the linear map for inputs of the form x ^ pow
+    matrix := [Zt | ];
+    for pow := 0 to d - 1 do
+        matrix cat:= Eltseq(&+[Evaluate(constants[i + 1], y) * (y ^ (Modexp(p, i, m) * pow mod m)) : i in [0..d - 1]]);
+        matrix := CatZeros(matrix, d * (pow + 1));
+    end for;
+    return Transpose(Matrix(Z, d, d, matrix));
+end function;
+
+// The variable matrices is a sequence of objects called 'matrix' for which we compute the following:
+// Compute the constants of a Zpr-linear map on E based on the given matrix
+// The matrix is with respect to the standard basis 1, x, ..., x ^ (d - 1)
+function MatricesToMaps(matrices, henselExponent)
+    Zt := Integers(p ^ henselExponent);
+
+    // Set up a system of equations to compute the constants
+    inputs := [Zx | ];  // Compute inputs (they do not depend on matrix)
+    for equation := 0 to d - 1 do
+        Append(~inputs, x ^ equation);
+    end for;
+    outputs := [Zx | ]; // Compute outputs (they do depend on matrix)
+    for matrix in matrices do
+        for equation := 0 to d - 1 do
+            Append(~outputs, Eltseq(ChangeRing(matrix, Zt) * Matrix(Zt, d, 1, [i eq equation select 1 else 0 : i in [0..d - 1]])));
+        end for;
+    end for;
+    return GetMapConstants(inputs, outputs, henselExponent);
+end function;

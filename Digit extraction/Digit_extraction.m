@@ -3,37 +3,52 @@ load "Digit extraction/Poly_eval.m";
 
 // Return the lifting polynomial with respect to the parameters p and e
 function GetLiftingPolynomial(p, e)
-    // First calculate output of the fi polynomials and then construct them
-    // based on Newton interpolation
-    digits := [[(((z0 ^ p) - ((z0 ^ p) mod (p ^ i))) div (p ^ i)) mod p : i in [1..e]] : z0 in [0..p - 1]];
-    polynomials := [&+[&*[x - xi : xi in {0..p - 1} diff {z0}] * Modinv(&*[z0 - xi : xi in {0..p - 1} diff {z0}], p ^ e)
-                                                               * digits[z0 + 1][i] : z0 in [0..p - 1]] : i in [1..e]];
+    // First calculate output of the fi polynomials
+    digits := [[((Z!((Integers(p ^ (i + 1))!z0) ^ p)) div (p ^ i)) mod p : i in [1..e]] : z0 in [0..p - 1]];
+
+    // Then construct them based on Newton interpolation
+    ring := Integers(p ^ (e + 1)); poly_ring<y> := PolynomialRing(ring);
+    full_factor := &*[poly_ring | x - xi : xi in {0..p - 1}];
+    polynomials := [poly_ring | ];
+    for i := 1 to e do
+        tmp := 0;
+        for z0 := 0 to p - 1 do
+            tmp +:= (full_factor div (y - z0)) * Modinv(Z!(&*[ring | z0 - xi : xi in {0..p - 1} diff {z0}]), p ^ e)
+                                               * digits[z0 + 1][i];
+        end for;
+        Append(~polynomials, tmp);
+    end for;
     
     // Return the lifting polynomial
-    poly := (x ^ p - &+[polynomials[i] * (p ^ i) : i in [1..e]]) mod (p ^ (e + 1));
-    return (Evaluate(poly, x + ((p - 1) div 2)) - ((p - 1) div 2)) mod (p ^ (e + 1));
+    poly := y ^ p - &+[polynomials[i] * (p ^ i) : i in [1..e]];
+    return Zx!(Evaluate(poly, y + ((p - 1) div 2)) - ((p - 1) div 2));
 end function;
 
 // Return the lowest digit removal polynomial with respect to the parameters p and e
 function GetLowestDigitRemovalPolynomial(p, e)
-    // Integers mod p ^ e
-    Zpe := Integers(p ^ e);
-    Zpe_poly := PolynomialRing(Zpe);
-    Zpe_y<y> := quo<Zpe_poly | Zpe_poly.1 ^ ((e - 1) * (p - 1) + 2)>;
+    degree := (p - 1) * (e - 1) + 1;
+    forward_differences := [Z | p eq 2 select index - (index mod 2) else
+                                              index - (Z!CenteredReduction(index, p)) : index in [0..degree]];
 
-    // Compute B(y) and Taylor expansion
-    B := ((1 + y) ^ p) - (y ^ p) - 1;
-    taylor := Eltseq(p * ((1 + y) ^ p) * (&+[(-B) ^ i : i in [0..(e - 1) * (p - 1) + 1]]));
-    taylor := CatZeros(taylor, (e - 1) * (p - 1) + 2);
-
-    // Compute the polynomial
-    poly := Zx!0;
-    ChangeUniverse(~taylor, Z);
-    for m := p to (e - 1) * (p - 1) + 1 do
-        factor := taylor[m + 1] / Factorial(m);
-        poly +:= &*[x - i : i in [0..m - 1]] * Numerator(factor) * Modinv(Denominator(factor), p ^ e);
+    // Compute forward differences
+    for iteration := 1 to degree do
+        for index := 0 to degree - iteration do
+            forward_differences[degree - index + 1] -:= forward_differences[degree - index];
+            forward_differences[degree - index + 1] := forward_differences[degree - index + 1] mod (p ^ e);
+        end for;
     end for;
-    return Evaluate(poly, x + ((p - 1) div 2)) mod (p ^ e);
+
+    // Compute result modulo p ^ e
+    ring := Integers(p ^ e); poly_ring<y> := PolynomialRing(ring);
+    factor := 1; poly := 0;
+    prod := 1; p_factors := 1;
+    for index := 1 to degree + 1 do
+        poly +:= (forward_differences[index] div p_factors) * Modinv(prod, p ^ e) * factor;
+        factor *:= (y - index + 1);
+        prod := ((prod * index) div (p ^ Valuation(index, p))) mod (p ^ e);
+        p_factors *:= p ^ Valuation(index, p);
+    end for;
+    return Zx!poly;
 end function;
 
 // Return the lowest digit retain polynomial with respect to the parameters p and e

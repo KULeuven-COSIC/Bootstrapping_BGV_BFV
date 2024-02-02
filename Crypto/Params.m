@@ -25,8 +25,9 @@ Zt_poly := PolynomialRing(Zt);
 
 // Structure of automorphism group and coprime factorization of m
 Zm := Integers(m);
-factors_m := [];
-usePowerOfTwo := false;
+factors_m := [];                  // Factorization of m for HElib linear transformations
+mat_dimensions := [];             // Matrix dimensions for our linear transformations (specified in reverse order: L_T, ..., L_1)
+usePowerOfTwo := false;           // Use SEAL or our version of linear transformations if true and HElib version if false
 
 // Real and complex numbers used for error estimation
 R := RealField(10);

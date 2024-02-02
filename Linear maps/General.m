@@ -6,6 +6,7 @@ function GetBabyGiantParams(size)
 end function;
 
 // Return the baby-step/giant-step parameters for general linear transformations
+// This function is a generalization of the above function (their outputs are consistent)
 function GetGeneralBabyGiantParams(sizes)
     if #sizes eq 0 then
         return [Z | ], [Z | ];

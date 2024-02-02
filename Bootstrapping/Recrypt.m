@@ -1,6 +1,10 @@
 load "Linear maps/GeneralCyclotomic/Linear_maps.m";
+load "Linear maps/PowerOfTwo/Linear_maps.m";
 load "Digit extraction/Digit_extraction.m";
 load "Bootstrapping/Common.m";
+
+// HElib version of bootstrapping
+if GetLTVersion() eq 1 then
 
 // Generate the switch keys that are necessary during the linear transformations
 function GenerateSwitchKeysRecrypt(sk)
@@ -84,6 +88,8 @@ end function;
 
 // Generate all variables necessary for the recryption procedure
 function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+    assert henselExponentPlaintext lt henselExponentCiphertext;
+
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
     bootKey := GenBootKeyRecrypt(sk, pk, henselExponentCiphertext);
@@ -105,7 +111,7 @@ function DecodeRecryptVariables(variables)
            variables[9], variables[10], variables[11], variables[12], variables[13], variables[14];
 end function;
 
-// Given a fully-packed ciphertext c, return a recryption of all of its coefficients
+// Given a fully packed ciphertext c, return a recryption of all of its coefficients
 function Recrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
@@ -159,3 +165,380 @@ function Recrypt(c, recrypt_variables)
     end for;
     return u;
 end function;
+
+// Our version of bootstrapping
+elif GetLTVersion() eq 3 then
+
+// We need at least two dimensions, because matrix factors are merged with M and M^(-1)
+// One can get rid of this merging by setting the first and last matrix dimension to 1
+// However, to facilitate the implementation, this is not allowed for the first matrix
+// dimension if p = 1 (mod 4): its size must be greater than 1
+if #mat_dimensions lt 2 then
+    error "There must be at least two matrix dimensions.";
+end if;
+
+// Generate all variables necessary for the recryption procedure
+forward GenerateSwitchKeysRecrypt; forward GenerateConstants;
+function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+    assert henselExponentPlaintext lt henselExponentCiphertext;
+
+    // Generate various keys and constants for the linear maps
+    rk := GenRelinKey(sk);
+    bootKey := GenBootKeyRecrypt(sk, pk, henselExponentCiphertext);
+    adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
+    adapted_evalInvConstantsBack := GenerateConstants(henselExponentPlaintext, henselExponentCiphertext);
+    rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys := GenerateSwitchKeysRecrypt(sk);
+    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
+    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+
+    return <rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
+            adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
+            liftingPolynomial, lowestDigitRetainPolynomials>;
+end function;
+
+// Decode all variables necessary for the recryption procedure
+function DecodeRecryptVariables(variables)
+    return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7], variables[8],
+           variables[9], variables[10], variables[11], variables[12];
+end function;
+
+if p mod 4 eq 1 then    // Non-cyclic case
+
+// Generate the switch keys that are necessary during the linear transformations
+function GenerateSwitchKeysRecrypt(sk)
+    // Store backward and rotation switch keys
+    rotationSwitchKeysAhead := [];
+    switchKeysMinusD := [];
+
+    // First stage merged with M and M^(-1)
+    dimensions := [GetNbDimensions(), 1]; generators, dim_sizes := ComputeGenSizes(dimensions);
+    keys, back_key := MatMulGeneralBabyGiantSwitchKeys(sk, [p] cat generators, [d] cat dim_sizes: bad_dimension := 1);
+    Append(~rotationSwitchKeysAhead, keys); Append(~switchKeysMinusD, back_key);
+
+    // Other stages
+    for dim := 2 to GetNbDimensions() - 2 do
+        generators, dim_sizes := ComputeGenSizes([dim]);
+        keys, back_key := MatMulGeneralBabyGiantSwitchKeys(sk, generators, dim_sizes: bad_dimension := dim);
+        Append(~rotationSwitchKeysAhead, keys); Append(~switchKeysMinusD, back_key);
+    end for;
+
+    // Last stage merged with M and M^(-1)
+    dim := GetNbDimensions() - 1; dim_size := d * GetDimensionSize(dim);
+    Append(~rotationSwitchKeysAhead, MatMulGeneralBabyGiantSwitchKeys(sk, [(5 ^ (m div (4 * dim_size))) mod m], [dim_size]));
+
+    // Generate unpacking keys
+    unpackingKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    return rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys;
+end function;
+
+// Generate the constants for the linear transformations
+function GenerateConstants(henselExponentPlaintext, henselExponentCiphertext)
+    adapted_evalConstantsAhead := []; adapted_evalConstantsBack := [];
+    adapted_evalInvConstantsAhead := []; adapted_evalInvConstantsBack := [];
+
+    // Constants for M and M^(-1)
+    M_constants := ComputeMConstants(henselExponentCiphertext);
+    MInv_constants := ComputeMInvConstants(henselExponentCiphertext);
+
+    // First stage merged with M
+    dimensions := [GetNbDimensions(), 1]; first_generators, first_dim_sizes := ComputeGenSizes(dimensions);
+    first_constants := SparseEvalStage_1Constants(dimensions, henselExponentPlaintext);
+    constants, generators, dim_sizes := MergeMaps(M_constants, [p], [d], first_constants, first_generators,
+                                                  first_dim_sizes, true, henselExponentPlaintext: outer_bad_dimension := 1);
+    adapted_constantsAhead, adapted_constantsBack := MatMulGeneralBadDimensionAdaptedConstants(constants, generators, dim_sizes,
+                                                                                               1, henselExponentPlaintext);
+    Append(~adapted_evalConstantsAhead, adapted_constantsAhead); Append(~adapted_evalConstantsBack, adapted_constantsBack);
+
+    // First stage merged with M^(-1)
+    first_inverse_constants := SparseEvalInvStage_1Constants(dimensions, henselExponentCiphertext);
+    for index := 1 to #first_inverse_constants do     // Compensate for extra factor of d
+        first_inverse_constants[index] *:= Modinv(d, p ^ henselExponentCiphertext);
+        first_inverse_constants[index] := first_inverse_constants[index] mod (p ^ henselExponentCiphertext);
+    end for;
+    constants := MergeMaps(first_inverse_constants, first_generators, first_dim_sizes, MInv_constants,
+                           [p], [d], false, henselExponentCiphertext);
+    adapted_constantsAhead, adapted_constantsBack := MatMulGeneralBadDimensionAdaptedConstants(constants, generators, dim_sizes,
+                                                                                               1, henselExponentCiphertext);
+    Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead); Append(~adapted_evalInvConstantsBack, adapted_constantsBack);
+
+    // Other stages
+    for dim := 2 to GetNbDimensions() - 2 do
+        constants := SparseEvalStage_dimConstants(dim, henselExponentPlaintext);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim,
+                                                                                              henselExponentPlaintext);
+        Append(~adapted_evalConstantsAhead, adapted_constantsAhead);
+        Append(~adapted_evalConstantsBack, adapted_constantsBack);
+
+        inverse_constants := SparseEvalInvStage_dimConstants(dim, henselExponentCiphertext);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(inverse_constants, dim,
+                                                                                              henselExponentCiphertext);
+        Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead);
+        Append(~adapted_evalInvConstantsBack, adapted_constantsBack);
+    end for;
+
+    // New generator for last dimension
+    dim := GetNbDimensions() - 1; new_dim_sizes := [d * GetDimensionSize(dim)];
+    new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
+
+    // Last stage merged with M^(-1)
+    last_generators, last_dim_sizes := ComputeGenSizes([dim]);
+    last_constants := SparseEvalStage_dimConstants(dim, henselExponentPlaintext);
+    constants, generators, dim_sizes := MergeMaps(last_constants, last_generators, last_dim_sizes, MInv_constants,
+                                                  [p], [d], false, henselExponentPlaintext);
+    constants := MergeGenerators(constants, generators, dim_sizes, new_generators, new_dim_sizes, henselExponentPlaintext:
+                                 old_bad_dimension := dim);
+    adapted_constantsAhead := MatMulGeneralGoodDimensionAdaptedConstants(constants, new_generators, new_dim_sizes,
+                                                                         henselExponentPlaintext);
+    Append(~adapted_evalConstantsAhead, adapted_constantsAhead);
+
+    // Last stage merged with M
+    last_inverse_constants := SparseEvalInvStage_dimConstants(dim, henselExponentCiphertext);
+    constants := MergeMaps(M_constants, [p], [d], last_inverse_constants, last_generators, last_dim_sizes,
+                           true, henselExponentCiphertext: outer_bad_dimension := dim);
+    constants := MergeGenerators(constants, generators, dim_sizes, new_generators, new_dim_sizes, henselExponentCiphertext:
+                                 old_bad_dimension := dim);
+    adapted_constantsAhead := MatMulGeneralGoodDimensionAdaptedConstants(constants, new_generators, new_dim_sizes,
+                                                                         henselExponentCiphertext);
+    Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead);
+
+    return adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead, adapted_evalInvConstantsBack;
+end function;
+
+// Given a fully packed ciphertext c, return a recryption of all of its coefficients
+function Recrypt(c, recrypt_variables)
+    // Decode recryption variables
+    rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
+    liftingPolynomial, lowestDigitRetainPolynomials := DecodeRecryptVariables(recrypt_variables);
+
+    // Compute generators
+    dimensions := [GetNbDimensions(), 1]; first_generators, first_dim_sizes := ComputeGenSizes(dimensions);
+    first_generators := [p] cat first_generators; first_dim_sizes := [d] cat first_dim_sizes;
+    dim := GetNbDimensions() - 1; new_dim_sizes := [d * GetDimensionSize(dim)];
+    new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
+
+    // Start with homomorphic inner product
+    u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    // Last stage merged with M
+    u := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], new_generators, new_dim_sizes,
+                                             rotationSwitchKeysAhead[dim]);
+
+    // Other stages
+    dim := GetNbDimensions() - 2;
+    while dim ge 2 do
+        u := MatMul1DBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], adapted_evalInvConstantsBack[dim],
+                                           dim, rotationSwitchKeysAhead[dim], switchKeysMinusD[dim]);
+        dim -:= 1;
+    end while;
+
+    // First stage merged with M^(-1)
+    u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], first_generators,
+                                            first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
+
+    // Unpack the slots
+    unpacked_u := UnpackSlotsPowerOfTwo(u, unpackingKeys);
+
+    // Digit extraction
+    henselExponentCiphertext := GetHenselExponent(bootKey);
+    for ind := 1 to #unpacked_u do
+        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
+                                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                              div_pFunc, lowestDigitRetainPolynomials);
+    end for;
+
+    // Repack the slots
+    u := RepackSlotsPowerOfTwo(unpacked_u);
+
+    // First stage merged with M
+    u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalConstantsAhead[1], adapted_evalConstantsBack[1], first_generators,
+                                            first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
+
+    // Other stages
+    for dim := 2 to GetNbDimensions() - 2 do
+        u := MatMul1DBadDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], adapted_evalConstantsBack[dim],
+                                           dim, rotationSwitchKeysAhead[dim], switchKeysMinusD[dim]);
+    end for;
+
+    // Last stage merged with M^(-1)
+    dim := GetNbDimensions() - 1;
+    return MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
+                                               rotationSwitchKeysAhead[dim]);
+end function;
+
+else    // Cyclic case
+
+// Generate the switch keys that are necessary during the linear transformations
+function GenerateSwitchKeysRecrypt(sk)
+    // Store backward and rotation switch keys
+    rotationSwitchKeysAhead := [];
+    switchKeysMinusD := [];
+
+    // First stage merged with M and M^(-1)
+    generators, dim_sizes := ComputeGenSizes([1]);
+    keys, back_key := MatMulGeneralBabyGiantSwitchKeys(sk, [(p ^ 2) mod m] cat generators,
+                                                           [d div 2] cat dim_sizes: bad_dimension := 1);
+    Append(~rotationSwitchKeysAhead, keys); Append(~switchKeysMinusD, back_key);
+
+    // Generate switch keys for all dimensions
+    for dim := 2 to GetNbDimensions() - 1 do
+        generators, dim_sizes := ComputeGenSizes([dim]);
+        keys, back_key := MatMulGeneralBabyGiantSwitchKeys(sk, generators, dim_sizes: bad_dimension := dim);
+        Append(~rotationSwitchKeysAhead, keys); Append(~switchKeysMinusD, back_key);
+    end for;
+
+    // Last stage merged with M and M^(-1)
+    dim := GetNbDimensions(); dim_size := (d div 2) * GetDimensionSize(dim);
+    Append(~rotationSwitchKeysAhead, MatMulGeneralBabyGiantSwitchKeys(sk, [(5 ^ (m div (4 * dim_size))) mod m], [dim_size]));
+
+    // Generate unpacking keys
+    unpackingKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    return rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys;
+end function;
+
+// Generate the constants for the linear transformations
+function GenerateConstants(henselExponentPlaintext, henselExponentCiphertext)
+    adapted_evalConstantsAhead := []; adapted_evalConstantsBack := [];
+    adapted_evalInvConstantsAhead := []; adapted_evalInvConstantsBack := [];
+
+    // Constants for M and M^(-1)
+    M_constants := ComputeMConstants(henselExponentCiphertext);
+    M_constants := [M_constants[2 * i - 1] : i in [1..#M_constants div 2]];
+    MInv_constants := ComputeMInvConstants(henselExponentCiphertext);
+    MInv_constants := [MInv_constants[2 * i - 1] : i in [1..#MInv_constants div 2]];
+
+    // First stage merged with M
+    first_generators, first_dim_sizes := ComputeGenSizes([1]);
+    first_constants := SparseEvalStage_dimConstants(1, henselExponentPlaintext);
+    constants, generators, dim_sizes := MergeMaps(M_constants, [(p ^ 2) mod m], [d div 2], first_constants, first_generators,
+                                                  first_dim_sizes, true, henselExponentPlaintext: outer_bad_dimension := 1);
+    adapted_constantsAhead, adapted_constantsBack := MatMulGeneralBadDimensionAdaptedConstants(constants, generators, dim_sizes,
+                                                                                               1, henselExponentPlaintext);
+    Append(~adapted_evalConstantsAhead, adapted_constantsAhead); Append(~adapted_evalConstantsBack, adapted_constantsBack);
+
+    // First stage merged with M^(-1)
+    first_inverse_constants := SparseEvalInvStage_dimConstants(1, henselExponentCiphertext);
+    constants := MergeMaps(first_inverse_constants, first_generators, first_dim_sizes, MInv_constants,
+                           [(p ^ 2) mod m], [d div 2], false, henselExponentCiphertext);
+    adapted_constantsAhead, adapted_constantsBack := MatMulGeneralBadDimensionAdaptedConstants(constants, generators, dim_sizes,
+                                                                                               1, henselExponentCiphertext);
+    Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead); Append(~adapted_evalInvConstantsBack, adapted_constantsBack);
+
+    for dim := 2 to GetNbDimensions() - 1 do
+        // Forward
+        constants := SparseEvalStage_dimConstants(dim, henselExponentPlaintext);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim,
+                                                                                              henselExponentPlaintext);
+        Append(~adapted_evalConstantsAhead, adapted_constantsAhead);
+        Append(~adapted_evalConstantsBack, adapted_constantsBack);
+
+        // Inverse
+        inverse_constants := SparseEvalInvStage_dimConstants(dim, henselExponentCiphertext);
+        adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(inverse_constants, dim,
+                                                                                              henselExponentCiphertext);
+        Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead);
+        Append(~adapted_evalInvConstantsBack, adapted_constantsBack);
+    end for;
+
+    // New generator for last dimension
+    dim := GetNbDimensions(); new_dim_sizes := [(d div 2) * GetDimensionSize(dim)];
+    new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
+
+    // Last stage merged with M^(-1)
+    last_generators, last_dim_sizes := ComputeGenSizes([dim]);
+    last_constants := SparseEvalStage_dimConstants(dim, henselExponentPlaintext);
+    constants, generators, dim_sizes := MergeMaps(last_constants, last_generators, last_dim_sizes, MInv_constants,
+                                                  [(p ^ 2) mod m], [d div 2], false, henselExponentPlaintext);
+    constants := MergeGenerators(constants, generators, dim_sizes, new_generators, new_dim_sizes, henselExponentPlaintext:
+                                 old_bad_dimension := dim);
+    adapted_constantsAhead := MatMulGeneralGoodDimensionAdaptedConstants(constants, new_generators, new_dim_sizes,
+                                                                         henselExponentPlaintext);
+    Append(~adapted_evalConstantsAhead, adapted_constantsAhead);
+
+    // Last stage merged with M
+    last_inverse_constants := SparseEvalInvStage_dimConstants(dim, henselExponentCiphertext);
+    for index := 1 to #last_inverse_constants do     // Compensate for extra factor of d
+        last_inverse_constants[index] *:= Modinv(d, p ^ henselExponentCiphertext);
+        last_inverse_constants[index] := last_inverse_constants[index] mod (p ^ henselExponentCiphertext);
+    end for;
+    constants := MergeMaps(M_constants, [(p ^ 2) mod m], [d div 2], last_inverse_constants, last_generators, last_dim_sizes,
+                           true, henselExponentCiphertext: outer_bad_dimension := dim);
+    constants := MergeGenerators(constants, generators, dim_sizes, new_generators, new_dim_sizes, henselExponentCiphertext:
+                                 old_bad_dimension := dim);
+    adapted_constantsAhead := MatMulGeneralGoodDimensionAdaptedConstants(constants, new_generators, new_dim_sizes,
+                                                                         henselExponentCiphertext);
+    Append(~adapted_evalInvConstantsAhead, adapted_constantsAhead);
+
+    return adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead, adapted_evalInvConstantsBack;
+end function;
+
+// Given a fully packed ciphertext c, return a recryption of all of its coefficients
+function Recrypt(c, recrypt_variables)
+    // Decode recryption variables
+    rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
+    liftingPolynomial, lowestDigitRetainPolynomials := DecodeRecryptVariables(recrypt_variables);
+
+    // Compute generators
+    first_generators, first_dim_sizes := ComputeGenSizes([1]);
+    first_generators := [(p ^ 2) mod m] cat first_generators; first_dim_sizes := [d div 2] cat first_dim_sizes;
+    dim := GetNbDimensions(); new_dim_sizes := [(d div 2) * GetDimensionSize(dim)];
+    new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
+
+    // Start with homomorphic inner product
+    u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    // Last stage merged with M
+    u := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], new_generators, new_dim_sizes,
+                                             rotationSwitchKeysAhead[dim]);
+
+    dim := GetNbDimensions() - 1;
+    while dim ge 2 do
+        u := MatMul1DBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], adapted_evalInvConstantsBack[dim],
+                                           dim, rotationSwitchKeysAhead[dim], switchKeysMinusD[dim]);
+        dim -:= 1;
+    end while;
+
+    // First stage merged with M^(-1)
+    u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], first_generators,
+                                            first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
+
+    // Unpack the slots
+    unpacked_u := UnpackSlotsPowerOfTwo(u, unpackingKeys);
+
+    // Digit extraction
+    henselExponentCiphertext := GetHenselExponent(bootKey);
+    for ind := 1 to #unpacked_u do
+        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
+                                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                              div_pFunc, lowestDigitRetainPolynomials);
+    end for;
+
+    // Repack the slots
+    u := RepackSlotsPowerOfTwo(unpacked_u);
+
+    // First stage merged with M
+    u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalConstantsAhead[1], adapted_evalConstantsBack[1], first_generators,
+                                            first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
+
+    for dim := 2 to GetNbDimensions() - 1 do
+        u := MatMul1DBadDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], adapted_evalConstantsBack[dim],
+                                           dim, rotationSwitchKeysAhead[dim], switchKeysMinusD[dim]);
+    end for;
+
+    // Last stage merged with M^(-1)
+    dim := GetNbDimensions();
+    return MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
+                                               rotationSwitchKeysAhead[dim]);
+end function;
+
+end if;
+
+else
+
+error "Desired version of linear transformations is not supported!";
+
+end if;
