@@ -1,3 +1,6 @@
+// Count the number of basic homomorphic operations for the decomposed slot-to-coefficient
+// transformation for power-of-two cyclotomics
+// The count corresponds to the behaviour implemented in 'Linear maps/PowerOfTwo'
 load "Crypto/BFV/BFV.m";
 load "Linear maps/PowerOfTwo/Linear_maps.m";
 

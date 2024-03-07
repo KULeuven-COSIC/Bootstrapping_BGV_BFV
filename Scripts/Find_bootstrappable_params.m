@@ -1,3 +1,10 @@
+// Find parameters that are easily bootstrappable in the HElib implementation
+// This means that
+// 1) The parameter m should factor into smaller prime powers
+// 2) The parameter p should be small
+// 3) The parameter d should be small
+// This file does not check q and sigma, so the security level should be obtained
+// with the lattice estimator
 load "Crypto/Hypercube_structure.m";
 
 // Find all bootstrappable parameters in a given range

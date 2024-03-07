@@ -35,7 +35,7 @@ C := ComplexField(10);
 xi := Exp(2 * Pi(C) * C.1 / m);
 
 // Experimental constants
-can_max := 900;                   // To be determined experimentally from "Scripts/Find_can_max.m" after setting other parameters
+can_max := 900;                   // To be determined experimentally from 'Scripts/Find_can_max.m' after setting other parameters
 expansion_automorphism := 2^10;   // The maximum growth of the norm when an automorphism is applied to an element
 
 // Constants for determining the modulus chain and modulus switching details

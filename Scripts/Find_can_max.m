@@ -1,3 +1,8 @@
+// This file computes the experimental value of can_max in 'Crypto/Params.m' which
+// is necessary for noise estimation
+// This corresponds to Max([Modulus(Evaluate(sk, xi ^ e)) ^ 2 : e in [0..m - 1] | GCD(e, m) eq 1]) where
+// xi is a complex primitive m-th root of unity and sk ranges over the secret key distribution
+// This file gives the 80-th percentile for the above quantity
 load "Crypto/General.m";
 
 // Precomputation for Bluestein FFT
