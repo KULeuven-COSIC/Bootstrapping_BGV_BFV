@@ -71,3 +71,53 @@ function relinFunc(x, rk)
     end if;
     return x;
 end function;
+
+
+
+/*** Overwrite basic arithmetic functions to count number of operations and total depth ***/
+collision_param := 2^256;
+
+function IsDummyCiphertext(c)
+    // Keep set of IDs and whether ciphertext is relinearized
+    return Category(c) eq Category(<{Z | }, true>);
+end function;
+
+function addDummyFunc(x, y)
+    if IsDummyCiphertext(x) and IsDummyCiphertext(y) then
+        return <x[1] join y[1], x[2] and y[2]>;
+    elif IsDummyCiphertext(x) then
+        return x;
+    elif IsDummyCiphertext(y) then
+        return y;
+    end if;
+end function;
+
+function mulDummyFunc(x, y)
+    if IsDummyCiphertext(x) and IsDummyCiphertext(y) then
+        return <x[1] join y[1] join {Random(collision_param)}, true>;
+    elif IsDummyCiphertext(x) then
+        return x;
+    elif IsDummyCiphertext(y) then
+        return y;
+    end if;
+end function;
+
+function mulLazyDummyFunc(x, y)
+    if IsDummyCiphertext(x) and IsDummyCiphertext(y) then
+        if x[2] and y[2] then
+            return <x[1] join y[1], false>;
+        elif x[2] or y[2] then
+            return <x[1] join y[1] join {Random(collision_param)}, false>;
+        else
+            return <x[1] join y[1] join {Random(collision_param)} join {Random(collision_param)}, false>;
+        end if;
+    elif IsDummyCiphertext(x) then
+        return x;
+    elif IsDummyCiphertext(y) then
+        return y;
+    end if;
+end function;
+
+function relinDummyFunc(x)
+    return x[2] select x else <x[1] join {Random(collision_param)}, true>;
+end function;

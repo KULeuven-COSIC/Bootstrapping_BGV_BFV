@@ -19,19 +19,22 @@ end function;
 
 // Invert the given matrix over the slot algebra
 // The entries of the matrix should be elements of Zx
-function InvertMatrixOverSlotAlgebra(matrix, henselExponent)
+function InvertMatrixOverSlotAlgebra(matrix, henselExponent: sparse := false)
     assert henselExponent le e;
 
     // First invert the matrix over a finite field
     Fp_ext := ext<GF(p) | GetFirstSlotFactor()>;
     dim := NumberOfRows(matrix);
-    inv := Matrix(dim, dim, [Fp_ext | Eltseq(el) : el in Eltseq(matrix)]) ^ (-1);
+    inv := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Fp_ext!Eltseq(el[3])> : el in Eltseq(matrix)]) ^ (-1) else
+                         Matrix(dim, dim, [Fp_ext | Eltseq(el) : el in Eltseq(matrix)]) ^ (-1);
 
     // Now work over the slot algebra
     Zt_F1<y> := GetSlotAlgebra(henselExponent);
-    matrix := Matrix(dim, dim, [Zt_F1 | Eltseq(el) : el in Eltseq(matrix)]);
-    inv := Matrix(dim, dim, [Zt_F1 | Eltseq(el) : el in [Zx | Eltseq(el) : el in Eltseq(inv)]]);
-    I := DiagonalMatrix([Zt_F1 | 1 : i in [1..dim]]);
+    matrix := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Zt_F1!Eltseq(el[3])> : el in Eltseq(matrix)]) else
+                            Matrix(dim, dim, [Zt_F1 | Eltseq(el) : el in Eltseq(matrix)]);
+    inv := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Zt_F1!Eltseq(Zx!Eltseq(el[3]))> : el in Eltseq(inv)]) else
+                         Matrix(dim, dim, [Zt_F1 | Eltseq(Zx!Eltseq(el)) : el in Eltseq(inv)]);
+    I := sparse select IdentitySparseMatrix(Zt_F1, dim) else IdentityMatrix(Zt_F1, dim);
 
     // Perform Hensel lifting
     prec := henselExponent;

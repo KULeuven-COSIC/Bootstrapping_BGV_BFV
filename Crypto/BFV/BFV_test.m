@@ -19,7 +19,7 @@ ms1 := Decrypt(cs1, sk);
 "Test mod switch ms1", ms1 eq m1;
 
 cs2 := Encrypt(m2, t, pk);
-cs2 := ModSwitch(cs2, 3^10);
+cs2 := ModSwitch(cs2, 3^50);
 ms2 := Decrypt(cs2, sk);
 "Test mod switch ms2", ms2 eq m2;
 
@@ -54,7 +54,7 @@ mmr := Decrypt(cmr, sk);
 
 csm1 := Encrypt(m1, t, pk);
 csm2 := Encrypt(m2, t, pk);
-csm2 := ModSwitch(csm2, 2^150);
+csm2 := ModSwitch(csm2, Round(Sqrt(q)));
 csm := MulNR(csm1, csm2);
 msm := Decrypt(csm, sk);
 "Test hom mul no relin different mod", msm eq (((m1*m2) mod f) mod t);
@@ -75,7 +75,7 @@ cmm := Decrypt(ccm, sk);
 "Error after mul with relin", ErrorC(cmr, sk);
 
 // Computing max level of multiplications
-"Computing tree of consecutive levels ..... ";
+"Computing tree of consecutive levels .....";
 
 halfMax := 13;
 csq := c1;

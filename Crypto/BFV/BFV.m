@@ -7,7 +7,7 @@ scheme := "BFV";
 // - A number q' that is a power of baseModulus
 // - A number q'' such that q' * q'' is approximately equal to q
 // Mod switching is done by dividing by baseModulus
-baseModulus := 2 ^ 10;
+baseModulus := 2^10; modPrecision := 2^5;
 nbModuli := Floor(Log(baseModulus, q / Maximum(modPrecision, t)));
 q_prime := baseModulus ^ nbModuli;
 q_double_prime := Floor(q / q_prime);

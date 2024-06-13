@@ -63,7 +63,7 @@ end for;
 end if;
 
 // Only perform next test for our LT version if it can be done in one stage and there is almost complete splitting
-if (GetLTVersion() eq 3) and (#mat_dimensions eq 1) and ((p + 1) mod m eq 0) or ((p + (m div 2) + 1) mod m eq 0) then
+if (GetLTVersion() eq 3) and (#mat_dimensions eq 1) and (((p + 1) mod m eq 0) or ((p + (m div 2) + 1) mod m eq 0)) then
 // Fully packed slots
 parts := GetPlaintextParts(RandPol(t));
 mmm := EmbedInSlots([Zx | Evaluate(part, y ^ (m div 4)) : part in parts]);
@@ -98,8 +98,8 @@ if (GetLTVersion() eq 3) and (p mod m eq 1) then
 // Test sparse 2D matrix transformation in first and last dimension
 dimensions := [GetNbDimensions(), 1];
 dim_sizes := [GetDimensionSize(dim) : dim in dimensions];
-constants, matrix := SparseEvalStage_1Constants(dimensions, e);
-matrix := Evaluate(ChangeRing(matrix, Zx), y);
+constants, matrix := SparseEvalStage_1Constants(dimensions, e); mat_size := NumberOfRows(matrix);
+matrix := SparseMatrix(mat_size, mat_size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(ChangeRing(matrix, Zx))]);
 adapted_constantsAhead, adapted_constantsBack := MatMul2DBadDimensionAdaptedConstants(constants, dimensions, e);
 
 // Generate switch keys
@@ -122,8 +122,8 @@ end if;
 if (GetLTVersion() eq 3) and (#mat_dimensions gt 1) and (p mod m eq 1) then
 // Test sparse matrix transformation in second dimension
 dim := 2; dim_size := GetDimensionSize(dim);
-constants, matrix := SparseEvalStage_dimConstants(dim, e);
-matrix := Evaluate(ChangeRing(matrix, Zx), y);
+constants, matrix := SparseEvalStage_dimConstants(dim, e); mat_size := NumberOfRows(matrix);
+matrix := SparseMatrix(mat_size, mat_size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(ChangeRing(matrix, Zx))]);
 adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys
@@ -141,8 +141,8 @@ res := GetPlaintextParts(Decrypt(MatMul1DBadDimensionBabyGiant(c, adapted_consta
 
 // Test sparse matrix transformation in last dimension
 dim := GetNbDimensions() - 1; dim_size := GetDimensionSize(dim);
-constants, matrix := SparseEvalStage_dimConstants(dim, e);
-matrix := Evaluate(ChangeRing(matrix, Zx), y);
+constants, matrix := SparseEvalStage_dimConstants(dim, e); mat_size := NumberOfRows(matrix);
+matrix := SparseMatrix(mat_size, mat_size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(ChangeRing(matrix, Zx))]);
 adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys
@@ -166,8 +166,8 @@ c := Encrypt(mmm, t, pk);
 if (GetLTVersion() eq 3) and ((p + 1) mod m eq 0) or ((p + (m div 2) + 1) mod m eq 0) then
 // Test sparse matrix transformation in first dimension
 dim := 1; dim_size := GetDimensionSize(dim);
-constants, matrix := SparseEvalStage_dimConstants(dim, e);
-matrix := Evaluate(ChangeRing(matrix, Zx), y);
+constants, matrix := SparseEvalStage_dimConstants(dim, e); mat_size := NumberOfRows(matrix);
+matrix := SparseMatrix(mat_size, mat_size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(ChangeRing(matrix, Zx))]);
 adapted_constantsAhead, adapted_constantsBack := MatMul1DBadDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys
@@ -186,8 +186,8 @@ res := GetPlaintextParts(Decrypt(MatMul1DBadDimensionBabyGiant(c, adapted_consta
 
 // Test sparse matrix transformation in last dimension
 dim := GetNbDimensions(); dim_size := GetDimensionSize(dim);
-constants, matrix := SparseEvalStage_dimConstants(dim, e);
-matrix := Evaluate(ChangeRing(matrix, Zx), y);
+constants, matrix := SparseEvalStage_dimConstants(dim, e); mat_size := NumberOfRows(matrix);
+matrix := SparseMatrix(mat_size, mat_size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(ChangeRing(matrix, Zx))]);
 adapted_constants := MatMul1DGoodDimensionAdaptedConstants(constants, dim, e);
 
 // Generate switch keys

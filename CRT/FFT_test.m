@@ -11,7 +11,7 @@ function TestBluesteinFFT1()
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
-    x := [Random(p) : i in [1..m]];
+    x := [Random(p - 1) : i in [1..m]];
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT
@@ -32,7 +32,7 @@ function TestBluesteinFFT2()
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
-    x := [Random(p) : i in [1..m]];
+    x := [Random(p - 1) : i in [1..m]];
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT
@@ -53,7 +53,7 @@ function TestBluesteinFFT3()
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
-    x := [Random(p) : i in [1..m]];
+    x := [Random(p - 1) : i in [1..m]];
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT

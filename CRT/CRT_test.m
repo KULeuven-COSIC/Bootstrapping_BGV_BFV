@@ -14,5 +14,5 @@ res := DoubleCRTToSingleCRT(doubleCRT);
 // Test conversion between power and powerful basis
 poly := RandPol(partialModuli[#partialModuli - 1]);
 "Test conversion between power and powerful basis", PowerfulBasisToPolynomial(
-                                                    PolynomialToPowerfulBasis(poly, PrimeSquareFactorization(m)),
-                                                                                    PrimeSquareFactorization(m)) eq poly;
+                                                    PolynomialToPowerfulBasis(poly, PrimePowerFactorization(m)),
+                                                                                    PrimePowerFactorization(m)) eq poly;

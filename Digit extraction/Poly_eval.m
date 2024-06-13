@@ -51,107 +51,10 @@ function AreOddPolynomials(polynomials)
     return true;
 end function;
 
-// Return the parameters that lead to the smallest number of non-constant multiplications
-// Degree of the polynomial is at least k * (2 ^ m)
-function GetBestParameters(polynomials: lazy := false)
-    // We should have a list of polynomials
-    _, polynomials := IsPolynomialSequence(polynomials);
-
-    d := 0;     // Store the degree
-    for polynomial in polynomials do
-        d := Maximum(d, Degree(polynomial));    // Compute maximum degree
-        if Degree(polynomial) le 0 then
-            error "Degrees should be positive.";
-        end if;
-    end for;
-
-    // Check if all polynomials are odd
-    odd := AreOddPolynomials(polynomials);
-
-    // Compute best set of parameters by iteration
-    bestM := 0;
-    bestK := 0;
-    bestMultiplications := -1;
-    bestOdd := false;
-    for m := 0 to Ceiling(Log(2, d)) do
-        // Compute corresponding k parameter and number of multiplications (start with baby step only)
-        // Note that we cannot combine lazy rescaling with odd polynomials (different computation in the baby step)
-        // --> Lazy rescaling is prioritized since it can be set as a flag in the parameter list
-        k := Ceiling(d / (2 ^ m));
-        currentOdd := false;
-        if lazy then
-            if k eq 1 then
-                nbMultiplications := m - 1;
-            else
-                nbMultiplications := ((k - 1) div 2) + m;
-            end if;
-        else
-            if m eq 0 then
-                nbMultiplications := k - 1;
-            else
-                nbMultiplications := k + m - 2;
-            end if;
-
-            // Possibly use different algorithm if polynomials are odd (only if operation count is better)
-            if odd then
-                k_odd := k;
-                if m eq 0 then
-                    nbMultiplicationsOdd := (k_odd div 2) + Floor(Log(2, k_odd));
-                else
-                    // The optimized procedure only works for even k
-                    if (k_odd mod 2 eq 1) then
-                        k_odd +:= 1;
-                    end if;
-
-                    // Make sure that we can always compute x^k as a product of two factors that were computed in the baby step
-                    // This is done by multiplying x^e and x^d where either both e and d are odd or both are a power of 2
-                    // Note that this is not always possible if k == 0 (mod 4) and we might have to increase k by 2
-                    remaining_exponent := k_odd - FloorPowerOfTwo(k_odd - 1);
-                    if ((k_odd mod 4 eq 0) and (not IsPowerOfTwo(remaining_exponent))) then
-                        k_odd +:= 2;
-                    end if;
-
-                    // Now compute the actual number of multiplications
-                    nbMultiplicationsOdd := (k_odd div 2) + Floor(Log(2, k_odd - 1)) + m - 1;
-                end if;
-
-                // Check if odd parameters are better
-                if nbMultiplicationsOdd lt nbMultiplications then
-                    k := k_odd;
-                    nbMultiplications := nbMultiplicationsOdd;
-                    currentOdd := true;
-                end if;
-            end if;
-        end if;
-
-        // Add extra number for giant step
-        for polynomial in polynomials do
-            nbMultiplications +:= (Ceiling(Degree(polynomial) / k) - 1);
-            if lazy then    // One extra non-scalar multiplication in giant step
-                nbMultiplications +:= 1;
-                deg_mod := Degree(polynomial) mod k;    // One less non-scalar multiplication if baby step has only linear terms
-                if deg_mod ne 0 and deg_mod le ((k + 1) div 2) then
-                    nbMultiplications -:= 1;
-                end if;
-            end if;
-        end for;
-
-        // Check whether the parameters are better than the current best ones
-        if (bestMultiplications eq -1) or (nbMultiplications lt bestMultiplications) then
-            bestM := m;
-            bestK := k;
-            bestMultiplications := nbMultiplications;
-            bestOdd := currentOdd;
-        end if;
-    end for;
-    return bestM, bestK, bestMultiplications, bestOdd;
-end function;
-
 // Preprocessing for polynomial evaluation
 // Evaluate x^spacing using repeated square and multiply
 // Compute updated polynomials accordingly
-function PolyEvalPreprocessing(element, polynomials, mulFunc, sanitizeFunc)
-    _, polynomials := IsPolynomialSequence(polynomials);
+function PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc)
     spacing := GetSpacing(polynomials);
 
     // Evaluate x^spacing
@@ -185,79 +88,66 @@ function PolyEvalPreprocessing(element, polynomials, mulFunc, sanitizeFunc)
         polynomials[poly_index] := Zx!new_seq;
     end for;
 
-    // Remaining element and polynomials to use for evaluation
+    // Evaluation result and remaining polynomials
     return result, polynomials;
 end function;
 
 // Recursive part of baby-step/giant-step algorithm
-function PolyEvalRecursive(coeff, xExp1, xExp2, addFunc, mulFunc, m, k)
+// Splitting in three subpolynomials is not implemented
+// If allowed_depth is set to zero, the parameter is ignored
+function PolyEvalRecursive(coeff, xExp1, xExp2, addFunc, mulFunc, m, k, allowed_depth)
     // Base cases
     if #coeff eq 0 then
         return Universe(coeff)!0;
     elif m eq 0 then
-        result := Universe(coeff)!0;
-        for index := 1 to #coeff do  // Inner loop: baby step
-            result := addFunc(result, mulFunc(coeff[index], xExp1[index]));
-        end for;
-        return result;
+        if (allowed_depth gt 0) and (Ceiling(Log(2, #coeff)) + 1 gt allowed_depth) then
+            // Recursive case (only for optimal depth)
+            index := FloorPowerOfTwo(#coeff);       // Index for splitting up sequence
+            rec1 := PolyEvalRecursive(coeff[1..index], xExp1, xExp2, addFunc, mulFunc, m, k, 0);
+            rec2 := PolyEvalRecursive(coeff[index + 1..#coeff], xExp1, xExp2, addFunc, mulFunc, m, k, allowed_depth - 1);
+            return (index lt #coeff) select addFunc(rec1, mulFunc(rec2, xExp1[index])) else rec1;
+        else
+            result := Universe(coeff)!0;
+            for index := 1 to #coeff do             // Inner loop: baby step
+                if coeff[index] ne 0 then
+                    result := addFunc(result, mulFunc(coeff[index], xExp1[index]));
+                end if;
+            end for;
+            return result;
+        end if;
     end if;
 
     // Recursive case
     index := Minimum(k * 2 ^ (m - 1), #coeff);      // Index for splitting up sequence
-    rec1 := PolyEvalRecursive(coeff[1..index], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
-    rec2 := PolyEvalRecursive(coeff[index + 1..#coeff], xExp1, xExp2, addFunc, mulFunc, m - 1, k);
-    return addFunc(rec1, mulFunc(rec2, xExp2[m]));
+    rec1 := PolyEvalRecursive(coeff[1..index], xExp1, xExp2, addFunc, mulFunc, m - 1, k, allowed_depth);
+    rec2 := PolyEvalRecursive(coeff[index + 1..#coeff], xExp1, xExp2, addFunc, mulFunc, m - 1, k, allowed_depth - 1);
+    return (index lt #coeff) select addFunc(rec1, mulFunc(rec2, xExp2[m])) else rec1;
 end function;
 
-// Evaluate the given polynomials in the given element: the algorithm is optimized for lowest number of
-// multiplications since the depth is already optimal (counting only non-scalar multiplications)
-// Both addFunc and mulFunc must be able to evaluate expressions with constant and non-constant operands
-// This function can also execute the lazy baby-step/giant-step algorithm if
-// - The lazy flag is set to true
-// - An appropriate mulFunc is passed
-// - An appropriate santizer is passed
-function PolyEval(polynomials, element, addFunc, mulFunc: lazy := false, sanitizeFunc := func<x | x>)
-    // We should have a list of polynomials
-    isSequence, polynomials := IsPolynomialSequence(polynomials);
-
-    // Degrees should be positive
-    for polynomial in polynomials do
-        if Degree(polynomial) le 0 then
-            error "Degrees should be positive.";
-        end if;
-    end for;
-
-    // Evaluate x^spacing and update polynomials accordingly
-    // Also determine the optimal parameters for the remaining polynomials
-    element, polynomials := PolyEvalPreprocessing(element, polynomials, mulFunc, sanitizeFunc);
-    m, k, _, odd := GetBestParameters(polynomials: lazy := lazy);
-
+// Evaluate the given polynomials in the given element using the given parameters
+// This function does not implement preprocessing of the polynomials
+function PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd)
     // Precompute x ^ exp with exp = 1, ..., k
     xExp1 := [element];
     for exp := 2 to k do
-        if odd then
-            if (exp mod 2) eq 0 then
-                if IsPowerOfTwo(exp) or (exp eq k) then
-                    ind1 := (exp mod 4 eq 0) select FloorPowerOfTwo(exp - 1) else (exp div 2);
-                    ind2 := exp - ind1;
-                    Append(~xExp1, mulFunc(xExp1[ind1], xExp1[ind2]));
-                else
-                    Append(~xExp1, xExp1[1]);   // Just append garbage
-                end if;
+        // Choose indices such that the depth is as low as possible
+        if odd and (exp mod 2) eq 0 then
+            if IsPowerOfTwo(exp) or ((exp eq k) and (exp mod 4 eq 2)) then
+                ind1 := exp div 2;
+            elif exp eq k then
+                ind1 := (exp div 2) - 1;
             else
-                ind1 := FloorPowerOfTwo(exp);
-                ind2 := exp - ind1;
-                Append(~xExp1, mulFunc(xExp1[ind1], xExp1[ind2]));
+                continue;
             end if;
         else
-            // Choose indices such that the depth is as low as possible
-            ind1 := exp div 2;
-            ind2 := exp - ind1;
-
-            xExp1[ind1] := sanitizeFunc(xExp1[ind1]);
-            xExp1[ind2] := sanitizeFunc(xExp1[ind2]);
-            Append(~xExp1, mulFunc(xExp1[ind1], xExp1[ind2]));
+            ind1 := FloorPowerOfTwo(exp - 1);
         end if;
+
+        // Compute actual multiplication
+        ind2 := exp - ind1;
+        xExp1[ind1] := sanitizeFunc(xExp1[ind1]);
+        xExp1[ind2] := sanitizeFunc(xExp1[ind2]);
+        xExp1[exp] := mulFunc(xExp1[ind1], xExp1[ind2]);
     end for;
 
     // Sanitize result for giant step
@@ -273,13 +163,92 @@ function PolyEval(polynomials, element, addFunc, mulFunc: lazy := false, sanitiz
 
     // Return result via sequence of recursive calls
     coeffs := [Eltseq(polynomial) : polynomial in polynomials];
-    result := [sanitizeFunc(addFunc(coeff[1], PolyEvalRecursive(coeff[2..#coeff], xExp1, xExp2, addFunc,
-                                                                mulFunc, m, k))) : coeff in coeffs];
+    return [sanitizeFunc(addFunc(coeff[1], PolyEvalRecursive(coeff[2..#coeff], xExp1, xExp2, addFunc, mulFunc, m, k,
+                                                             optimal_depth select Ceiling(Log(2, #coeff)) else 0))) :
+                                                             coeff in coeffs];
+end function;
+
+// Return the parameters that lead to the smallest number of non-scalar multiplications
+// Degree of the polynomials is at most spacing * k * (2 ^ m)
+function GetBestParameters(polynomials: lazy := false, optimal_depth := false, ring := Zx)
+    // We should have a list of polynomials
+    _, polynomials := IsPolynomialSequence(polynomials);
+
+    // Degrees should be positive
+    for polynomial in polynomials do
+        if Degree(polynomial) le 0 then
+            error "Degrees should be positive.";
+        end if;
+    end for;
+
+    // Spacing and preprocessing
+    spacing := GetSpacing(polynomials);
+    tmp, polynomials := PolyEvalPreprocessing(polynomials, <{Z | }, true>, mulDummyFunc, func<x | x>);
+
+    // Check whether polynomials are odd and compute maximum degree
+    odd := AreOddPolynomials(polynomials);
+    d := Maximum([Degree(polynomial) : polynomial in polynomials]);
+    oddPolynomials := [&+[ring | (ring.1)^(2 * i + 1) : i in [0..Degree(polynomial) div 2]] : polynomial in polynomials];
+    fullPolynomials := [&+[ring | (ring.1)^i : i in [0..Degree(polynomial)]] : polynomial in polynomials];
+
+    // Compute best set of parameters by iteration
+    bestM := 0;
+    bestK := 0;
+    bestOdd := false;
+    bestMultiplications := -1;
+    for m := 0 to Ceiling(Log(2, d)) do
+        k_min := Ceiling(d / (2 ^ m));
+        k_max := Minimum(Maximum(CeilPowerOfTwo(k_min), 2), k_min + 5);     // Limited search space: at most 6 options
+        for k := k_min to k_max do
+            for currentOdd in {false} join {odd} do
+                // Odd evaluation algorithm uses even value of k
+                if currentOdd and (k mod 2 eq 1) then
+                    continue;
+                end if;
+
+                // Compute number of operations and depth
+                res := PolyEvalGivenParameters(currentOdd select oddPolynomials else fullPolynomials, tmp, addDummyFunc,
+                                               lazy select mulLazyDummyFunc else mulDummyFunc,
+                                               lazy select relinDummyFunc else func<x | x>, optimal_depth, m, k, currentOdd);
+
+                // Check whether the parameters are better than the current best ones
+                currentMultiplications := #(&join[el[1] : el in res]);
+                if (bestMultiplications eq -1) or (currentMultiplications lt bestMultiplications) then
+                    bestM := m;
+                    bestK := k;
+                    bestOdd := currentOdd;
+                    bestMultiplications := currentMultiplications;
+                end if;
+            end for;
+        end for;
+    end for;
+    return bestM, bestK, bestOdd, spacing, bestMultiplications;
+end function;
+
+// Evaluate the given polynomials in the given element
+// Both addFunc and mulFunc must be able to evaluate expressions with scalar and non-scalar operands
+// This function uses the optimal depth algorithm if the optimal_depth flag is set to true
+// This function can also execute the lazy baby-step/giant-step algorithm if
+// - The lazy flag is set to true
+// - An appropriate mulFunc is passed
+// - An appropriate sanitizer is passed
+function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x | x>, lazy := false,
+                                                          optimal_depth := false, ring := Zx)
+    // We should have a list of polynomials
+    isSequence, polynomials := IsPolynomialSequence(polynomials);
+
+    // Degrees should be positive
+    for polynomial in polynomials do
+        if Degree(polynomial) le 0 then
+            error "Degrees should be positive.";
+        end if;
+    end for;
+
+    // Compute preprocessing step and find best parameters for remaining polynomials
+    element, polynomials := PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc);
+    m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth, ring := ring);
 
     // Return single element if the polynomial was given in this format
-    if isSequence then
-        return result;
-    else
-        return result[1];
-    end if;
+    result := PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd);
+    return isSequence select result else result[1];
 end function;

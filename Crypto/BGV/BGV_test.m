@@ -75,7 +75,7 @@ cmm := Decrypt(ccm, sk);
 "Error after mul with relin", ErrorC(cmr, sk);
 
 // Computing max level of multiplications
-"Computing tree of consecutive levels ..... ";
+"Computing tree of consecutive levels .....";
 
 halfMax := 13;
 csq := c1;

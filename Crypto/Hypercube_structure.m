@@ -3,7 +3,7 @@
 load "CRT/CRT.m";
 
 // Make sure that we have a valid factorization for the powerful basis ring
-factors_m := factors_m eq [] select PrimeSquareFactorization(m) else factors_m;
+factors_m := factors_m eq [] select PrimePowerFactorization(m) else factors_m;
 assert IsCoprimeFactorization(m, factors_m);
 assert not usePowerOfTwo or IsPowerOfTwo(m);
 
@@ -208,7 +208,7 @@ function GetOurHypercubeStructure(p, m, mat_dimensions)
     // Half of first matrix dimension is used by representative -1
     if p mod 4 eq 1 then
         if mat_dimensions[1] lt 2 then
-            error "To facilitate the implementation, the first matrix dimension must greater than 1.";
+            error "To facilitate the implementation, the first matrix dimension must be greater than 1.";
         end if;
         mat_dimensions[1] div:= 2;
     end if;

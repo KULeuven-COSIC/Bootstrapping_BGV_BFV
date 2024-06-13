@@ -4,13 +4,13 @@
 load "Crypto/BFV/BFV.m";
 load "Linear maps/PowerOfTwo/Linear_maps.m";
 
-m := 2^16;
-n := EulerPhi(m);
-p := 2^16 + 1;
-d := Order(Integers(m)!p);
-l := n div d;
+m := 2^16;                      // m-th cyclotomic polynomial
+n := EulerPhi(m);               // Degree of f(x)
+p := 2^16 + 1;                  // Plaintext prime modulus
+d := Order(Integers(m)!p);      // Degree of irreducible factors
+l := n div d;                   // Number of slots
 
-mat_dimensions := [2^7, 2^8];
+mat_dimensions := [2^7, 2^8];   // Matrix dimensions for our linear transformations (specified in reverse order: L_T, ..., L_1)
 
 assert IsPowerOfTwo(m);
 assert IsPrime(p);

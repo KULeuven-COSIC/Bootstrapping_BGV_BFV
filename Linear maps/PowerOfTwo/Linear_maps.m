@@ -123,7 +123,8 @@ function SparseEvalInvStage_1Constants(dimensions, henselExponent)
 
     // Take multiple stages together
     matrix := &*factors[#factors - Valuation(&*[GetDimensionSize(dim) : dim in dimensions], 2) + 1..#factors];
-    matrix := Evaluate(InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent), y);
+    matrix := InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent: sparse := true); size := NumberOfRows(matrix);
+    matrix := SparseMatrix(size, size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(matrix)]);
     return EmbedSparse2DMatrixInSlots(matrix, dimensions, henselExponent), matrix;
 end function;
 
@@ -181,7 +182,8 @@ function SparseEvalInvStage_dimConstants(dim, henselExponent)
     // Take multiple stages together
     nb_prev := Valuation(&*mat_dimensions[1..dim - 1], 2);
     matrix := &*factors[#factors - nb_prev - Valuation(GetDimensionSize(dim), 2) + 1..#factors - nb_prev];
-    matrix := Evaluate(InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent), y);
+    matrix := InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent: sparse := true); size := NumberOfRows(matrix);
+    matrix := SparseMatrix(size, size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(matrix)]);
     return EmbedSparseMatrixInSlots(matrix, dim, henselExponent), matrix;
 end function;
 

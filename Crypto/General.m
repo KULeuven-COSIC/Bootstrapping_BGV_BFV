@@ -110,8 +110,8 @@ end function;
 
 
 
-// Compute a prime-square factorization
-function PrimeSquareFactorization(m)
+// Compute a prime-power factorization
+function PrimePowerFactorization(m)
     return Reverse(Sort([Z | el[1] ^ el[2] : el in Factorization(m)]));
 end function;
 
@@ -133,9 +133,14 @@ function IsCoprimeFactorization(m, factors_m)
     return true;
 end function;
 
-// Compute the largest power of two that is smaller than the given number
+// Compute the largest power of two that is less than or equal to the given number
 function FloorPowerOfTwo(element)
     return 2 ^ Floor(Log(2, element));
+end function;
+
+// Compute the smallest power of two that is greater than or equal to the given number
+function CeilPowerOfTwo(element)
+    return 2 ^ Ceiling(Log(2, element));
 end function;
 
 // Check if the given parameter is a power of two

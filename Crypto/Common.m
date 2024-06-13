@@ -29,11 +29,7 @@ forward HomomorphicInnerProduct;
 
 // Check whether the given variable is a ciphertext
 function IsCiphertext(c)
-    if Category(c) eq Category(<[Zx | ], 0, 0, R!0>) then
-        return true;
-    else
-        return false;
-    end if;
+    return Category(c) eq Category(<[Zx | ], 0, 0, R!0>);
 end function;
 
 // Return a new ciphertext that encrypts the constant 0

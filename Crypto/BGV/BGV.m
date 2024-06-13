@@ -14,7 +14,7 @@ scheme := "BGV";
 // - A number q' that is a power of baseModulus
 // - A number q'' such that q' * q'' is approximately equal to q
 // Mod switching is done by dividing by baseModulus
-baseModulus := t + 1;
+baseModulus := t + 1; modPrecision := 2^5;
 nbModuli := Floor(Log(baseModulus, q / t / modPrecision));
 q_prime := baseModulus ^ nbModuli;
 q_double_prime := Floor((q / q_prime - 1) / t) * t + 1;

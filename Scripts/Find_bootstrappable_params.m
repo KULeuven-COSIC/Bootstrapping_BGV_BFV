@@ -30,8 +30,8 @@ for m := n_min to m_max do
 
         // Check restrictions
         d := Order(Integers(m)!p);
-        if ((d le d_max) and (Maximum(PrimeSquareFactorization(m)) le m_factor_max)) then
-            //if AreBootstrappableAnyOrder(p, m, PrimeSquareFactorization(m)) then  // Checks HElib bootstrappable requirements
+        if ((d le d_max) and (Maximum(PrimePowerFactorization(m)) le m_factor_max)) then
+            //if AreBootstrappableAnyOrder(p, m, PrimePowerFactorization(m)) then  // Checks HElib bootstrappable requirements
                 "p =", p, "\t  n =", n, "\td =", d, "\t  m =", m, "\t", Factorization(m);
             //end if;
         end if;
