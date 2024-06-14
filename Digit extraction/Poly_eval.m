@@ -88,8 +88,8 @@ function PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc)
         polynomials[poly_index] := Zx!new_seq;
     end for;
 
-    // Evaluation result and remaining polynomials
-    return result, polynomials;
+    // Remaining polynomials and evaluation result
+    return polynomials, result;
 end function;
 
 // Recursive part of baby-step/giant-step algorithm
@@ -183,7 +183,7 @@ function GetBestParameters(polynomials: lazy := false, optimal_depth := false, r
 
     // Spacing and preprocessing
     spacing := GetSpacing(polynomials);
-    tmp, polynomials := PolyEvalPreprocessing(polynomials, <{Z | }, true>, mulDummyFunc, func<x | x>);
+    polynomials, tmp := PolyEvalPreprocessing(polynomials, <{Z | }, true>, mulDummyFunc, func<x | x>);
 
     // Check whether polynomials are odd and compute maximum degree
     odd := AreOddPolynomials(polynomials);
@@ -245,7 +245,7 @@ function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x
     end for;
 
     // Compute preprocessing step and find best parameters for remaining polynomials
-    element, polynomials := PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc);
+    polynomials, element := PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc);
     m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth, ring := ring);
 
     // Return single element if the polynomial was given in this format
