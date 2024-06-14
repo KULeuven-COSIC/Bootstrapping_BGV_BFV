@@ -163,7 +163,7 @@ parts := GetPlaintextParts(mmm);
 c := Encrypt(mmm, t, pk);
 
 // Only perform next tests for our LT version if there is almost complete splitting
-if (GetLTVersion() eq 3) and ((p + 1) mod m eq 0) or ((p + (m div 2) + 1) mod m eq 0) then
+if (GetLTVersion() eq 3) and (((p + 1) mod m eq 0) or ((p + (m div 2) + 1) mod m eq 0)) then
 // Test sparse matrix transformation in first dimension
 dim := 1; dim_size := GetDimensionSize(dim);
 constants, matrix := SparseEvalStage_dimConstants(dim, e); mat_size := NumberOfRows(matrix);
