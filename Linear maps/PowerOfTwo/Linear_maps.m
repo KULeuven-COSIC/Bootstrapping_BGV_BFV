@@ -51,6 +51,11 @@ end function;
 
 /*** Our linear transformations ***/
 
+// Multiply sequence of sparse l x l matrices
+function MultiplySparseMatrices(factors, ring)
+    return (#factors eq 0) select IdentitySparseMatrix(ring, l) else &*factors;
+end function;
+
 /*** E-linear maps ***/
 
 // Compute the constants for a two-dimensional E-linear transformation
@@ -92,8 +97,8 @@ function EmbedSparse2DMatrixInSlots(matrix, dimensions, henselExponent)
         // Complicated way to compute constant because rotations are two-dimensional
         for toIndex := 1 to l do
             hyperIndex := IndexToHypercube(toIndex);
-            fromIndex := HypercubeToIndex([var in dimensions select (hyperIndex[var] - i_seq[Find(dimensions, var)]) mod
-                                                                     dim_sizes[Find(dimensions, var)]
+            fromIndex := HypercubeToIndex([var in dimensions select (hyperIndex[var] - i_seq[Position(dimensions, var)]) mod
+                                                                     dim_sizes[Position(dimensions, var)]
                                                              else hyperIndex[var] : var in [1..GetNbDimensions()]]);
             Append(~slotContent, matrix[toIndex][fromIndex]);
         end for;
@@ -110,7 +115,8 @@ function SparseEvalStage_1Constants(dimensions, henselExponent)
     factors := ComputeCRTFactors(m div d, y ^ d, Zt_F1);
 
     // Take multiple stages together
-    matrix := &*factors[#factors - Valuation(&*[GetDimensionSize(dim) : dim in dimensions], 2) + 1..#factors];
+    matrix := MultiplySparseMatrices(factors[#factors - Valuation(&*[GetDimensionSize(dim) : dim in dimensions], 2) + 1..
+                                             #factors], Zt_F1);
     return EmbedSparse2DMatrixInSlots(matrix, dimensions, henselExponent), matrix;
 end function;
 
@@ -122,7 +128,8 @@ function SparseEvalInvStage_1Constants(dimensions, henselExponent)
     factors := ComputeCRTFactors(m div d, y ^ d, Zt_F1);
 
     // Take multiple stages together
-    matrix := &*factors[#factors - Valuation(&*[GetDimensionSize(dim) : dim in dimensions], 2) + 1..#factors];
+    matrix := MultiplySparseMatrices(factors[#factors - Valuation(&*[GetDimensionSize(dim) : dim in dimensions], 2) + 1..
+                                             #factors], Zt_F1);
     matrix := InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent: sparse := true); size := NumberOfRows(matrix);
     matrix := SparseMatrix(size, size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(matrix)]);
     return EmbedSparse2DMatrixInSlots(matrix, dimensions, henselExponent), matrix;
@@ -164,7 +171,8 @@ function SparseEvalStage_dimConstants(dim, henselExponent)
 
     // Take multiple stages together
     nb_prev := Valuation(&*mat_dimensions[1..dim - 1], 2);
-    matrix := &*factors[#factors - nb_prev - Valuation(GetDimensionSize(dim), 2) + 1..#factors - nb_prev];
+    matrix := MultiplySparseMatrices(factors[#factors - nb_prev - Valuation(GetDimensionSize(dim), 2) + 1..
+                                             #factors - nb_prev], Zt_F1);
     return EmbedSparseMatrixInSlots(matrix, dim, henselExponent), matrix;
 end function;
 
@@ -181,7 +189,8 @@ function SparseEvalInvStage_dimConstants(dim, henselExponent)
 
     // Take multiple stages together
     nb_prev := Valuation(&*mat_dimensions[1..dim - 1], 2);
-    matrix := &*factors[#factors - nb_prev - Valuation(GetDimensionSize(dim), 2) + 1..#factors - nb_prev];
+    matrix := MultiplySparseMatrices(factors[#factors - nb_prev - Valuation(GetDimensionSize(dim), 2) + 1..
+                                             #factors - nb_prev], Zt_F1);
     matrix := InvertMatrixOverSlotAlgebra(ChangeRing(matrix, Zx), henselExponent: sparse := true); size := NumberOfRows(matrix);
     matrix := SparseMatrix(size, size, [<el[1], el[2], Evaluate(el[3], y)> : el in Eltseq(matrix)]);
     return EmbedSparseMatrixInSlots(matrix, dim, henselExponent), matrix;

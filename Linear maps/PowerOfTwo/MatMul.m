@@ -462,7 +462,7 @@ function UnpackSlotsPowerOfTwo(c, switchKeys)
     for i := 1 to (p mod 4 eq 1 select Valuation(d, 2) else Valuation(d div 2, 2)) do
         tmp := result; result := [];
         for ctxt in tmp do
-            auto_ctxt := ApplyAutomorphismCiphertext(ctxt, p ^ (d div (2 ^ i)), switchKeys[i]);
+            auto_ctxt := ApplyAutomorphismCiphertext(ctxt, Modexp(p, d div (2 ^ i), m), switchKeys[i]);
             Append(~result, Add(ctxt, auto_ctxt));
             Append(~result, MulConstant(Sub(ctxt, auto_ctxt), -(x ^ (n - (2 ^ (i - 1))))));
         end for;

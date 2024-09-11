@@ -10,7 +10,7 @@ function SimulateMatMul(m, constants)
     index := 1;
     dim_sizes := [GetDimensionSize(dim) : dim in [1..GetNbDimensions()]];
     for constant in constants do
-        m_parts := GetPlaintextParts(ApplyAutomorphism(m, t, IndexToSequence(index, dim_sizes)));
+        m_parts := GetPlaintextParts(ApplyAutomorphismPlaintext(m, IndexToSequence(index, dim_sizes)));
         constant_parts := GetPlaintextParts(constant);
         res := [((res[i] + constant_parts[i] * m_parts[i]) mod GetFirstSlotFactor()) mod t : i in [1..l]];
 
@@ -86,9 +86,9 @@ switchKeysBack := [];
 switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dimensions[2], -dim_sizes[2]));
 for index := 2 to &*dim_sizes do
     positions := IndexToSequence(index, dim_sizes);
-    hyperIndexAhead := [var in dimensions select positions[Find(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
-    hyperIndexBack := [var in dimensions select positions[Find(dimensions, var)] - (Find(dimensions, var) - 1) * dim_sizes[2]
-                                         else 0 : var in [1..GetNbDimensions()]];
+    hyperIndexAhead := [var in dimensions select positions[Position(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
+    hyperIndexBack := [var in dimensions select positions[Position(dimensions, var)] - (Position(dimensions, var) - 1) *
+                            dim_sizes[2] else 0 : var in [1..GetNbDimensions()]];
     Append(~switchKeysAhead, GenSwitchKey(sk, hyperIndexAhead));
     Append(~switchKeysBack, GenSwitchKey(sk, hyperIndexBack));
 end for;
@@ -114,7 +114,7 @@ end if;
 mmm := RandPol(t);
 c := Encrypt(mmm, t, pk);
 
-switchKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+switchKeys := [GenSwitchKey(sk, Modexp(p, d div (2 ^ i), m)) : i in [1..Valuation(d, 2)]];
 c_seq := UnpackSlotsPowerOfTwo(c, switchKeys);
 c_new := RepackSlotsPowerOfTwo(c_seq);
 "Test unpacking and repacking cancel each other", Decrypt(c_new, sk) eq (mmm * d mod t);

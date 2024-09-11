@@ -90,8 +90,11 @@ function GenerateThinConstants(henselExponentPlaintext, henselExponentCiphertext
 end function;
 
 // Generate all variables necessary for the thin recryption procedure
-function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext, B)
     assert henselExponentPlaintext lt henselExponentCiphertext;
+    assert B le p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2;
+    assert (B eq p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) or
+           ((henselExponentCiphertext eq 2) and (p ne 2));
 
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
@@ -99,27 +102,37 @@ function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExp
     adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
     adapted_evalInvConstantsBack := GenerateThinConstants(henselExponentPlaintext, henselExponentCiphertext);
     rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys := GenerateSwitchKeysThinRecrypt(sk);
-    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
-    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+    additionConstant := (p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) * SumPowerfulBasis(factors_m);
+
+    // Generate required polynomials
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        liftingPolynomial := []; lowestDigitRetainPolynomials := [];
+        lowestDigitRemovalPolynomialOverRange := GetLowestDigitRemovalPolynomialOverRange(p, B);
+    else
+        liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+        lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
+                                         iteration in [1..henselExponentCiphertext]];
+        lowestDigitRemovalPolynomialOverRange := [];
+    end if;
 
     return <rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
             adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys, additionConstant,
-            liftingPolynomial, lowestDigitRetainPolynomials>;
+            liftingPolynomial, lowestDigitRetainPolynomials, lowestDigitRemovalPolynomialOverRange>;
 end function;
 
 // Decode all variables necessary for the thin recryption procedure
 function DecodeThinRecryptVariables(variables)
     return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7],
-           variables[8], variables[9], variables[10], variables[11], variables[12];
+           variables[8], variables[9], variables[10], variables[11], variables[12], variables[13];
 end function;
 
 // Given a thin ciphertext c, return a recryption of all of its slots
 function ThinRecrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys, additionConstant,
-    liftingPolynomial, lowestDigitRetainPolynomials := DecodeThinRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys,
+    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
     // Apply series of linear maps
     // --> Only the first dimension can be a bad one
@@ -155,10 +168,14 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return OurDigitExtraction(u, p, henselExponentCiphertext,
-                                    henselExponentCiphertext - GetHenselExponent(c),
-                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                              div_pFunc, lowestDigitRetainPolynomials);
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+    else
+        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                  div_pFunc, lowestDigitRetainPolynomials);
+    end if;
 end function;
 
 // SEAL version of thin bootstrapping
@@ -200,8 +217,11 @@ function GenerateThinConstants(henselExponentPlaintext, henselExponentCiphertext
 end function;
 
 // Generate all variables necessary for the thin recryption procedure
-function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext, B)
     assert henselExponentPlaintext lt henselExponentCiphertext;
+    assert B le p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2;
+    assert (B eq p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) or
+           ((henselExponentCiphertext eq 2) and (p ne 2));
 
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
@@ -209,25 +229,35 @@ function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExp
     adapted_sparseConstants, adapted_sparseInvConstants := GenerateThinConstants(henselExponentPlaintext,
                                                                                  henselExponentCiphertext);
     rotationSwitchKeys, coefficientSwitchKeys := GenerateSwitchKeysThinRecrypt(sk);
-    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
-    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+    additionConstant := (p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) * SumPowerfulBasis(factors_m);
+
+    // Generate required polynomials
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        liftingPolynomial := []; lowestDigitRetainPolynomials := [];
+        lowestDigitRemovalPolynomialOverRange := GetLowestDigitRemovalPolynomialOverRange(p, B);
+    else
+        liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+        lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
+                                         iteration in [1..henselExponentCiphertext]];
+        lowestDigitRemovalPolynomialOverRange := [];
+    end if;
 
     return <rk, bootKey, adapted_sparseConstants, adapted_sparseInvConstants, rotationSwitchKeys, coefficientSwitchKeys,
-            additionConstant, liftingPolynomial, lowestDigitRetainPolynomials>;
+            additionConstant, liftingPolynomial, lowestDigitRetainPolynomials, lowestDigitRemovalPolynomialOverRange>;
 end function;
 
 // Decode all variables necessary for the thin recryption procedure
 function DecodeThinRecryptVariables(variables)
     return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7],
-           variables[8], variables[9];
+           variables[8], variables[9], variables[10];
 end function;
 
 // Given a thin ciphertext c, return a recryption of all of its slots
 function ThinRecrypt(c, recrypt_variables)
     // Decode recryption variables
-    rk, bootKey, adapted_sparseConstants, adapted_sparseInvConstants, rotationSwitchKeys, coefficientSwitchKeys,
-    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials := DecodeThinRecryptVariables(recrypt_variables);
+    rk, bootKey, adapted_sparseConstants, adapted_sparseInvConstants, rotationSwitchKeys,
+    coefficientSwitchKeys, additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
     // Apply linear map
     c := MatMulBabyGiant(c, adapted_sparseConstants, rotationSwitchKeys);
@@ -241,10 +271,14 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return OurDigitExtraction(u, p, henselExponentCiphertext,
-                                    henselExponentCiphertext - GetHenselExponent(c),
-                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                              div_pFunc, lowestDigitRetainPolynomials);
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+    else
+        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                  div_pFunc, lowestDigitRetainPolynomials);
+    end if;
 end function;
 
 // Our version of thin bootstrapping
@@ -252,8 +286,11 @@ elif GetLTVersion() eq 3 then
 
 // Generate all variables necessary for the thin recryption procedure
 forward GenerateSwitchKeysThinRecrypt; forward GenerateThinConstants;
-function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext, B)
     assert henselExponentPlaintext lt henselExponentCiphertext;
+    assert B le p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2;
+    assert (B eq p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) or
+           ((henselExponentCiphertext eq 2) and (p ne 2));
 
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
@@ -261,19 +298,28 @@ function GenerateThinRecryptVariables(sk, pk, henselExponentPlaintext, henselExp
     adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
     adapted_evalInvConstantsBack := GenerateThinConstants(henselExponentPlaintext, henselExponentCiphertext);
     rotationSwitchKeysAhead, switchKeysMinusD, traceKeys := GenerateSwitchKeysThinRecrypt(sk);
-    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
-    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+    additionConstant := (p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) * SumPowerfulBasis(factors_m);
+
+    // Generate required polynomials
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        liftingPolynomial := []; lowestDigitRetainPolynomials := [];
+        lowestDigitRemovalPolynomialOverRange := GetLowestDigitRemovalPolynomialOverRange(p, B);
+    else
+        liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+        lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
+                                         iteration in [1..henselExponentCiphertext]];
+        lowestDigitRemovalPolynomialOverRange := [];
+    end if;
 
     return <rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
             adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, traceKeys, additionConstant,
-            liftingPolynomial, lowestDigitRetainPolynomials>;
+            liftingPolynomial, lowestDigitRetainPolynomials, lowestDigitRemovalPolynomialOverRange>;
 end function;
 
 // Decode all variables necessary for the thin recryption procedure
 function DecodeThinRecryptVariables(variables)
     return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7],
-           variables[8], variables[9], variables[10], variables[11], variables[12];
+           variables[8], variables[9], variables[10], variables[11], variables[12], variables[13];
 end function;
 
 if p mod 4 eq 1 then    // Non-cyclic case
@@ -301,7 +347,7 @@ function GenerateSwitchKeysThinRecrypt(sk)
     end for;
 
     // Generate trace switch keys
-    traceKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    traceKeys := [GenSwitchKey(sk, Modexp(p, d div (2 ^ i), m)) : i in [1..Valuation(d, 2)]];
 
     return rotationSwitchKeysAhead, switchKeysMinusD, traceKeys;
 end function;
@@ -359,8 +405,9 @@ end function;
 function ThinRecrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, traceKeys, additionConstant,
-    liftingPolynomial, lowestDigitRetainPolynomials := DecodeThinRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, traceKeys,
+    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
     // First stage
     dimensions := [GetNbDimensions(), 1];
@@ -401,10 +448,14 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return OurDigitExtraction(u, p, henselExponentCiphertext,
-                                    henselExponentCiphertext - GetHenselExponent(c),
-                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                              div_pFunc, lowestDigitRetainPolynomials);
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+    else
+        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                  div_pFunc, lowestDigitRetainPolynomials);
+    end if;
 end function;
 
 else    // Cyclic case
@@ -427,7 +478,7 @@ function GenerateSwitchKeysThinRecrypt(sk)
     end for;
 
     // Generate trace switch keys
-    traceKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    traceKeys := [GenSwitchKey(sk, Modexp(p, d div (2 ^ i), m)) : i in [1..Valuation(d, 2)]];
 
     return rotationSwitchKeysAhead, switchKeysMinusD, traceKeys;
 end function;
@@ -474,8 +525,9 @@ end function;
 function ThinRecrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, traceKeys, additionConstant,
-    liftingPolynomial, lowestDigitRetainPolynomials := DecodeThinRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, traceKeys,
+    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
     for dim := 1 to GetNbDimensions() do
         if dim eq GetNbDimensions() then
@@ -508,10 +560,14 @@ function ThinRecrypt(c, recrypt_variables)
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
-    return OurDigitExtraction(u, p, henselExponentCiphertext,
-                                    henselExponentCiphertext - GetHenselExponent(c),
-                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                              div_pFunc, lowestDigitRetainPolynomials);
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+    else
+        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                  div_pFunc, lowestDigitRetainPolynomials);
+    end if;
 end function;
 
 end if;

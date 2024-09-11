@@ -6,7 +6,7 @@
 // Convert the given polynomial to a sequence if it is not a sequence already
 function IsPolynomialSequence(polynomials)
     isSequence := true;
-    if Category(polynomials) eq Category(Zx!0) then
+    if Category(polynomials) eq RngUPolElt then
         isSequence := false;
         polynomials := [polynomials];
     end if;
@@ -183,11 +183,14 @@ function GetBestParameters(polynomials: lazy := false, optimal_depth := false, r
 
     // Spacing and preprocessing
     spacing := GetSpacing(polynomials);
-    polynomials, tmp := PolyEvalPreprocessing(polynomials, <{Z | }, true>, mulDummyFunc, func<x | x>);
+    polynomials, tmp := PolyEvalPreprocessing(polynomials, <{Z | }, true>, mulCountFunc, func<x | x>);
 
     // Check whether polynomials are odd and compute maximum degree
     odd := AreOddPolynomials(polynomials);
     d := Maximum([Degree(polynomial) : polynomial in polynomials]);
+
+    // Take generic polynomials to count number of multiplications
+    // This is to ensure that we don't miss any multiplications
     oddPolynomials := [&+[ring | (ring.1)^(2 * i + 1) : i in [0..Degree(polynomial) div 2]] : polynomial in polynomials];
     fullPolynomials := [&+[ring | (ring.1)^i : i in [0..Degree(polynomial)]] : polynomial in polynomials];
 
@@ -198,7 +201,7 @@ function GetBestParameters(polynomials: lazy := false, optimal_depth := false, r
     bestMultiplications := -1;
     for m := 0 to Ceiling(Log(2, d)) do
         k_min := Ceiling(d / (2 ^ m));
-        k_max := Minimum(Maximum(CeilPowerOfTwo(k_min), 2), k_min + 5);     // Limited search space: at most 6 options
+        k_max := Minimum(Maximum(CeilPowerOfTwo(k_min), 2), k_min + 9);     // Limited search space: at most 10 options
         for k := k_min to k_max do
             for currentOdd in {false} join {odd} do
                 // Odd evaluation algorithm uses even value of k
@@ -207,9 +210,9 @@ function GetBestParameters(polynomials: lazy := false, optimal_depth := false, r
                 end if;
 
                 // Compute number of operations and depth
-                res := PolyEvalGivenParameters(currentOdd select oddPolynomials else fullPolynomials, tmp, addDummyFunc,
-                                               lazy select mulLazyDummyFunc else mulDummyFunc,
-                                               lazy select relinDummyFunc else func<x | x>, optimal_depth, m, k, currentOdd);
+                res := PolyEvalGivenParameters(currentOdd select oddPolynomials else fullPolynomials, tmp, addCountFunc,
+                                               lazy select mulLazyCountFunc else mulCountFunc,
+                                               lazy select relinCountFunc else func<x | x>, optimal_depth, m, k, currentOdd);
 
                 // Check whether the parameters are better than the current best ones
                 currentMultiplications := #(&join[el[1] : el in res]);

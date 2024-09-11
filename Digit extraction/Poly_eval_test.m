@@ -35,23 +35,23 @@ result := Zx!Evaluate(Zft_poly!Zt_poly!poly, Zft!Zt_poly!m);
 non_scalar_result := true; total_result := true;
 for degree := 100 to 127 do
     poly := x ^ degree + x ^ (degree - Random(1, 2));
-    res := PolyEval(poly, [0], func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                      else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
-                                           (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+    res := PolyEval(poly, [0], func<x, y | (Category(x) eq RngIntElt and Category(y) eq RngIntElt) select Maximum(x, y)
+                                      else (Category(x) eq RngIntElt and Category(y) ne RngIntElt) select y else
+                                           (Category(x) ne RngIntElt and Category(y) eq RngIntElt) select x else
                                            [Maximum(x[1], y[1])]>,
-                               func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                      else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
-                                           (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+                               func<x, y | (Category(x) eq RngIntElt and Category(y) eq RngIntElt) select Maximum(x, y)
+                                      else (Category(x) eq RngIntElt and Category(y) ne RngIntElt) select y else
+                                           (Category(x) ne RngIntElt and Category(y) eq RngIntElt) select x else
                                            [Maximum(x[1], y[1]) + 1]>);
     non_scalar_result and:= (res[1] eq Ceiling(Log(2, degree)));
 
-    res := PolyEval(poly, [0], func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                      else (Category(x) eq Category(0) and Category(y) ne Category(0)) select y else
-                                           (Category(x) ne Category(0) and Category(y) eq Category(0)) select x else
+    res := PolyEval(poly, [0], func<x, y | (Category(x) eq RngIntElt and Category(y) eq RngIntElt) select Maximum(x, y)
+                                      else (Category(x) eq RngIntElt and Category(y) ne RngIntElt) select y else
+                                           (Category(x) ne RngIntElt and Category(y) eq RngIntElt) select x else
                                            [Maximum(x[1], y[1])]>,
-                               func<x, y | (Category(x) eq Category(0) and Category(y) eq Category(0)) select Maximum(x, y)
-                                      else (Category(x) eq Category(0) and Category(y) ne Category(0)) select [y[1] + 1] else
-                                           (Category(x) ne Category(0) and Category(y) eq Category(0)) select [x[1] + 1] else
+                               func<x, y | (Category(x) eq RngIntElt and Category(y) eq RngIntElt) select Maximum(x, y)
+                                      else (Category(x) eq RngIntElt and Category(y) ne RngIntElt) select [y[1] + 1] else
+                                           (Category(x) ne RngIntElt and Category(y) eq RngIntElt) select [x[1] + 1] else
                                            [Maximum(x[1], y[1]) + 1]>: optimal_depth := true);
     total_result and:= (res[1] eq Ceiling(Log(2, degree + 1)));
 end for;
@@ -88,18 +88,13 @@ end for;
 
 
 
-// Check whether the given variable is an augmented ciphertext
-function IsAugmentedCiphertext(c)
-    return Category(c) eq Category(<<[Zx | ], 0, 0, R!0>, {0}>);
-end function;
-
 // Add the given ciphertexts and/or constants together
 function addAugmentedFunc(x, y)
-    if IsAugmentedCiphertext(x) and IsAugmentedCiphertext(y) then
+    if IsCiphertext(x) and IsCiphertext(y) then
         return <Add(x[1], y[1]), x[2] join y[2]>;
-    elif IsAugmentedCiphertext(x) then
+    elif IsCiphertext(x) then
         return <AddConstant(x[1], y), x[2]>;
-    elif IsAugmentedCiphertext(y) then
+    elif IsCiphertext(y) then
         return <AddConstant(y[1], x), y[2]>;
     end if;
 end function;
@@ -107,11 +102,11 @@ end function;
 // Multiply the given ciphertexts and/or integer constants together
 // This function cannot be used for lazy relinearization
 function mulAugmentedFunc(x, y, rk)
-    if IsAugmentedCiphertext(x) and IsAugmentedCiphertext(y) then
+    if IsCiphertext(x) and IsCiphertext(y) then
         return <Mul(x[1], y[1], rk), x[2] join y[2] join {Random(collision_param)}>;
-    elif IsAugmentedCiphertext(x) then
+    elif IsCiphertext(x) then
         return <MulConstant(x[1], y), x[2]>;
-    elif IsAugmentedCiphertext(y) then
+    elif IsCiphertext(y) then
         return <MulConstant(y[1], x), y[2]>;
     end if;
 end function;
@@ -119,7 +114,7 @@ end function;
 // Multiply the given ciphertexts and/or integer constants together
 // This function can be used for lazy relinearization
 function mulLazyAugmentedFunc(x, y, rk)
-    if IsAugmentedCiphertext(x) and IsAugmentedCiphertext(y) then
+    if IsCiphertext(x) and IsCiphertext(y) then
         set := x[2] join y[2];
         // First relinearize both ciphertexts if necessary
         if GetNbParts(x[1]) eq 3 then
@@ -137,9 +132,9 @@ function mulLazyAugmentedFunc(x, y, rk)
         AutomaticModSwitchMul(~x[1]);
         AutomaticModSwitchMul(~y[1]);
         return <MulNR(x[1], y[1]), set>;
-    elif IsAugmentedCiphertext(x) then
+    elif IsCiphertext(x) then
         return <MulConstant(x[1], y), x[2]>;
-    elif IsAugmentedCiphertext(y) then
+    elif IsCiphertext(y) then
         return <MulConstant(y[1], x), y[2]>;
     end if;
 end function;

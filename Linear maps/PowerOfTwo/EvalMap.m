@@ -1,14 +1,3 @@
-// Compute the bit-reversed number
-function BitReverse(number, nb_digits)
-    return SequenceToInteger(Reverse(IntegerToSequence(number, 2, nb_digits)), 2);
-end function;
-
-// Compute n x n S-matrix
-function ComputeSMatrix(n, W_4n, ring)
-    return SparseMatrix(Matrix(ring, n, n, &cat[[W_4n ^ ((5 ^ row) * BitReverse(col, Valuation(n, 2))) : col in [0..n - 1]] :
-                                                                                                         row in [0..n - 1]]));
-end function;
-
 // Compute n x n W-matrix
 function ComputeWMatrix(n, W_8n, ring)
     return SparseMatrix(ring, n, n, [<i + 1, i + 1, W_8n ^ (5 ^ i)> : i in [0..n - 1]]);
@@ -17,8 +6,8 @@ end function;
 // Decompose S-matrix (of dimension m/4 x m/4)
 function ComputeSFactors(m, W_m, ring)
     n := m div 4;
-    if n eq 2 then
-        return [ComputeSMatrix(n, W_m, ring)];
+    if n eq 1 then
+        return [];
     else
         res := [VerticalJoin(HorizontalJoin(IdentitySparseMatrix(ring, n div 2), ComputeWMatrix(n div 2, W_m, ring)),
                              HorizontalJoin(IdentitySparseMatrix(ring, n div 2), -ComputeWMatrix(n div 2, W_m, ring)))];

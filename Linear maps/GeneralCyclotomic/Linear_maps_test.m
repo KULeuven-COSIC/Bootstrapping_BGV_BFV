@@ -12,12 +12,12 @@ for exp := 1 to d - 1 do
     Append(~frobeniusSwitchKeys, GenSwitchKey(sk, Modexp(p, exp, m)));
 end for;
 
-m := RandPol(t);
+mmm := RandPol(t);
 index := IndexToHypercube(Random(l - 1) + 1);
-"Test slots contain right values", GetFromSlot(m, index) eq Zx!Evaluate(m, y ^ GetHypercubeRepresentative(index));
+"Test slots contain right values", GetFromSlot(mmm, index) eq Zx!Evaluate(mmm, y ^ GetHypercubeRepresentative(index));
 
-m := EmbedInSlots([Zx | i eq 1 select GetNormalElement() else 0 : i in [1..l]]);
-c := Encrypt(m, t, pk);
+mmm := EmbedInSlots([Zx | i eq 1 select GetNormalElement() else 0 : i in [1..l]]);
+c := Encrypt(mmm, t, pk);
 
 dim := 1;
 constants := EvalStage_1Constants(1, e);
@@ -49,7 +49,7 @@ res := GetPlaintextParts(Decrypt(c, sk));
 
 // Embed single coefficient into slots
 ind := Random(l - 1) + 1;
-m := EmbedInSlots([Zx | i eq ind select Evaluate(GetNormalElement(), y ^ (p ^ Random(d - 1))) else 0 : i in [1..l]]);
+m := EmbedInSlots([Zx | i eq ind select Evaluate(GetNormalElement(), y ^ Modexp(p, Random(d - 1), m)) else 0 : i in [1..l]]);
 c := Encrypt(m, t, pk);
 
 // Compute linear transformation in first dimension

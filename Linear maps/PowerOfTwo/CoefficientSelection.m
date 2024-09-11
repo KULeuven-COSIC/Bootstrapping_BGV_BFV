@@ -10,7 +10,7 @@ end function;
 // Evaluate trace to the subring that encodes sparse plaintexts
 function EvaluateTrace(c, switchKeys)
     for i := 1 to (p mod 4 eq 1 select Valuation(d, 2) else Valuation(d div 2, 2)) do
-        c := Add(c, ApplyAutomorphismCiphertext(c, p ^ (d div (2 ^ i)), switchKeys[i]));
+        c := Add(c, ApplyAutomorphismCiphertext(c, Modexp(p, d div (2 ^ i), m), switchKeys[i]));
     end for;
     return c;
 end function;

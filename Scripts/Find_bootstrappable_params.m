@@ -5,6 +5,7 @@
 // 3) The parameter d should be small
 // This file does not check q and sigma, so the security level should be obtained
 // with the lattice estimator
+load "Crypto/General.m";
 load "Crypto/Hypercube_structure.m";
 
 // Find all bootstrappable parameters in a given range

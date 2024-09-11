@@ -1,6 +1,5 @@
 // This file stores some functions related to the hypercube structure
 //--------------------------
-load "CRT/CRT.m";
 
 // Make sure that we have a valid factorization for the powerful basis ring
 factors_m := factors_m eq [] select PrimePowerFactorization(m) else factors_m;

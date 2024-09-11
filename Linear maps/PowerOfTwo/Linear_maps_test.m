@@ -47,7 +47,7 @@ adapted_constants := MatMul2DGoodDimensionAdaptedConstants(constants, dimensions
 switchKeysAhead := [];
 for index := 2 to &*dim_sizes do
     positions := IndexToSequence(index, [GetDimensionSize(dim) : dim in dimensions]);
-    hyperIndexAhead := [var in dimensions select positions[Find(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
+    hyperIndexAhead := [var in dimensions select positions[Position(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
     Append(~switchKeysAhead, GenSwitchKey(sk, hyperIndexAhead));
 end for;
 
@@ -107,7 +107,7 @@ switchKeysAhead := [];
 switchKeyMinusD := GenSwitchKey(sk, Get1DHyperIndex(dimensions[2], -dim_sizes[2]));
 for index := 2 to &*dim_sizes do
     positions := IndexToSequence(index, dim_sizes);
-    hyperIndexAhead := [var in dimensions select positions[Find(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
+    hyperIndexAhead := [var in dimensions select positions[Position(dimensions, var)] else 0 : var in [1..GetNbDimensions()]];
     Append(~switchKeysAhead, GenSwitchKey(sk, hyperIndexAhead));
 end for;
 

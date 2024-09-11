@@ -2,6 +2,26 @@
 //--------------------------
 load "Crypto/Params.m";
 
+// Encryption parameters
+n := EulerPhi(m);   // Degree of f(x)
+t := p^e;           // Plaintext modulus during bootstrapping
+
+// Integers and quotient rings
+Z := Integers();
+Zm := Integers(m);
+Zt := Integers(t);
+
+// Polynomial rings
+Zx<x> := PolynomialRing(Z);
+Zt_poly := PolynomialRing(Zt);
+f := Zx!CyclotomicPolynomial(m);
+
+// Real and complex numbers used for error estimation
+R := RealField(10);
+C := ComplexField(10);
+
+
+
 // Convert the given index to a sequence of indices based on the given maxima
 function IndexToSequence(index, max_seq)
     index -:= 1;
@@ -71,12 +91,44 @@ end function;
 
 // Return the maximum value of the sequence (or value) with a minimum of 1
 function MaximumOrOne(seq)
-    if (Category(seq) eq Category(0)) or (Category(seq) eq Category(R!0)) then
+    if (Category(seq) eq RngIntElt) or (Category(seq) eq FldReElt) then
         seq := [seq];
     end if;
 
     // Compute maximum of extended sequence
     return Maximum(seq cat [1]);
+end function;
+
+// Decimate the given polynomial
+function DecimatePolynomial(polynomial, factor)
+    poly_seq := Eltseq(polynomial);
+    return Zx![poly_seq[factor * i + 1] : i in [0..(#poly_seq - 1) div factor]];
+end function;
+
+// Split the given polynomial in subpolynomials
+function SplitPolynomial(polynomial, factor)
+    poly_seq := Eltseq(polynomial);
+    res := [[Z | ] : i in [1..factor]];
+    for index := 1 to #poly_seq do
+        Append(~res[((index - 1) mod factor) + 1], poly_seq[index]);
+    end for;
+    return [Zx | el : el in res];
+end function;
+
+// Expand the given polynomial
+function ExpandPolynomial(polynomial, factor)
+    poly_seq := Eltseq(polynomial);
+    return Zx![IsDivisibleBy(i, factor) select poly_seq[i div factor + 1] else 0 : i in [0..factor * (#poly_seq - 1)]];
+end function;
+
+// Combine the given polynomials
+function CombinePolynomials(polynomials)
+    max_deg := Maximum([Degree(polynomial) : polynomial in polynomials]); res := [Z | ];
+    poly_seq := [CatZeros(Eltseq(polynomial), max_deg + 1) : polynomial in polynomials];
+    for index := 0 to #polynomials * (max_deg + 1) - 1 do
+        Append(~res, poly_seq[(index mod #polynomials) + 1][(index div #polynomials) + 1]);
+    end for;
+    return Zx!res;
 end function;
 
 
@@ -149,12 +201,9 @@ function IsPowerOfTwo(m)
     return result and (p eq 2);
 end function;
 
-// Find index of element in list
-function Find(list, element)
-    for index := 1 to #list do
-        if list[index] eq element then
-            return index;
-        end if;
-    end for;
-    return 0;
-end function;
+
+
+// More encryption parameters
+w := CeilPowerOfTwo(Root(q, L));       // Base for relinearization, relin key goes from w^0 to w^(L-1)
+noiseLevelRelin := t * w * Sqrt((n / 12) * L * (errorB * n / 2)) *
+                   noiseBufferRelin;   // Noise is brought to this level before key switching

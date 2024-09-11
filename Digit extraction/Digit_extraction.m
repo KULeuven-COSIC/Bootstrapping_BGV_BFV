@@ -65,6 +65,23 @@ function GetLowestDigitRetainPolynomial(p, e)
     end if;
 end function;
 
+// Return the lowest digit removal polynomial modulo p ^ 2 over the bounded range [-B, B]
+function GetLowestDigitRemovalPolynomialOverRange(p, B)
+    base_ring := Integers(p ^ 2);
+    poly_ring<x> := PolynomialRing(base_ring);
+    base_poly := &*[x - index : index in [-B..B]];
+    func_ring<y> := quo<poly_ring | base_poly ^ 2>;
+
+    // Compute result by iteration
+    result := 0;
+    for index := -B to B do
+        result +:= index * (1 - (((y - index) ^ p) ^ (p - 1)));
+    end for;
+
+    // Convert digit retain to digit removal polynomial
+    return Zx!((poly_ring!(y - result)) mod (p * base_poly));
+end function;
+
 // Halevi and Shoup digit extraction algorithm
 function HaleviShoupDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc, liftingPolynomial)
     // Populate the triangle with digits
@@ -111,7 +128,7 @@ end function;
 // Our digit extraction algorithm
 // This procedure is only briefly mentioned in the paper and discussed in more detail in our
 // work on polynomial functions modulo p^e and faster bootstrapping for homomorphic encryption
-function OurDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc, lowestDigitRetainPolynomials)
+function OurDigitExtraction(u, e, v, addFunc, subFunc, mulFunc, div_pFunc, lowestDigitRetainPolynomials)
     // Populate the triangle with digits
     // Less memory is needed if only one column and the result are stored
     col := [u : i in [1..v]];   // Current column of the upper left triangle
@@ -162,4 +179,10 @@ function OurDigitExtraction(u, p, e, v, addFunc, subFunc, mulFunc, div_pFunc, lo
         res := div_pFunc(subFunc(res, digits[#digits]));
     end for;
     return res;
+end function;
+
+// Digit extraction algorithm over bounded range
+// This is the algorithm from Ma et al. for e = 2 and p > 2
+function BoundedRangeDigitExtraction(u, addFunc, mulFunc, div_pFunc, lowestDigitRemovalPolynomialOverRange)
+    return div_pFunc(PolyEval(lowestDigitRemovalPolynomialOverRange, u, addFunc, mulFunc));
 end function;

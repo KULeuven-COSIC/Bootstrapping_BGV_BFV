@@ -175,7 +175,7 @@ function MulNR(c1, c2)
         return <[c31 mod c1[3], c32 mod c1[3]], c1[2], c1[3], sigma_2>;
     else
         c33 := ((c1[1][2]*c2[1][2]) mod f);
-        c32 := (((c1[1][1] + c1[1][2])*(c2[1][1] + c2[1][2]) mod f) - c31 - c33); // Computing mul via karatsuba to save one mul
+        c32 := (((c1[1][1] + c1[1][2])*(c2[1][1] + c2[1][2]) mod f) - c31 - c33); // Computing mul via Karatsuba to save one mul
         return <[c31 mod c1[3], c32 mod c1[3], c33 mod c1[3]], c1[2], c1[3], sigma_2>;
     end if;
 end function;

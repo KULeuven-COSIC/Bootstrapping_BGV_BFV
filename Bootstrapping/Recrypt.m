@@ -87,8 +87,11 @@ function GenerateConstants(henselExponentPlaintext, henselExponentCiphertext)
 end function;
 
 // Generate all variables necessary for the recryption procedure
-function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext, B)
     assert henselExponentPlaintext lt henselExponentCiphertext;
+    assert B le p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2;
+    assert (B eq p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) or
+           ((henselExponentCiphertext eq 2) and (p ne 2));
 
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
@@ -96,27 +99,38 @@ function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponen
     adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead, adapted_evalInvConstantsBack,
     unpackConstants, repackConstants := GenerateConstants(henselExponentPlaintext, henselExponentCiphertext);
     rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys := GenerateSwitchKeysRecrypt(sk);
-    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
-    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+    additionConstant := (p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) * SumPowerfulBasis(factors_m);
+
+    // Generate required polynomials
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        liftingPolynomial := []; lowestDigitRetainPolynomials := [];
+        lowestDigitRemovalPolynomialOverRange := GetLowestDigitRemovalPolynomialOverRange(p, B);
+    else
+        liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+        lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
+                                         iteration in [1..henselExponentCiphertext]];
+        lowestDigitRemovalPolynomialOverRange := [];
+    end if;
 
     return <rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
             adapted_evalInvConstantsBack, unpackConstants, repackConstants, rotationSwitchKeysAhead, switchKeyMinusD,
-            frobeniusSwitchKeys, additionConstant, liftingPolynomial, lowestDigitRetainPolynomials>;
+            frobeniusSwitchKeys, additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+            lowestDigitRemovalPolynomialOverRange>;
 end function;
 
 // Decode all variables necessary for the recryption procedure
 function DecodeRecryptVariables(variables)
     return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7], variables[8],
-           variables[9], variables[10], variables[11], variables[12], variables[13], variables[14];
+           variables[9], variables[10], variables[11], variables[12], variables[13], variables[14], variables[15];
 end function;
 
 // Given a fully packed ciphertext c, return a recryption of all of its coefficients
 function Recrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, unpackConstants, repackConstants, rotationSwitchKeysAhead, switchKeyMinusD, frobeniusSwitchKeys,
-    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials := DecodeRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, unpackConstants, repackConstants, rotationSwitchKeysAhead, switchKeyMinusD,
+    frobeniusSwitchKeys, additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeRecryptVariables(recrypt_variables);
 
     // Start with homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
@@ -142,10 +156,15 @@ function Recrypt(c, recrypt_variables)
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     for ind := 1 to #unpacked_u do
-        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
-                                                                  henselExponentCiphertext - GetHenselExponent(c),
-                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                              div_pFunc, lowestDigitRetainPolynomials);
+        if (henselExponentCiphertext eq 2) and (p ne 2) then
+            unpacked_u[ind] := BoundedRangeDigitExtraction(unpacked_u[ind], addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+        else
+            unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], henselExponentCiphertext,
+                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                  div_pFunc, lowestDigitRetainPolynomials);
+        end if;
     end for;
 
     // Repack the slots
@@ -179,8 +198,11 @@ end if;
 
 // Generate all variables necessary for the recryption procedure
 forward GenerateSwitchKeysRecrypt; forward GenerateConstants;
-function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext)
+function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponentCiphertext, B)
     assert henselExponentPlaintext lt henselExponentCiphertext;
+    assert B le p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2;
+    assert (B eq p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) or
+           ((henselExponentCiphertext eq 2) and (p ne 2));
 
     // Generate various keys and constants for the linear maps
     rk := GenRelinKey(sk);
@@ -188,19 +210,28 @@ function GenerateRecryptVariables(sk, pk, henselExponentPlaintext, henselExponen
     adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
     adapted_evalInvConstantsBack := GenerateConstants(henselExponentPlaintext, henselExponentCiphertext);
     rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys := GenerateSwitchKeysRecrypt(sk);
-    additionConstant := EmbedInPowerfulBasis(Floor((p ^ henselExponentCiphertext) / 2 / (p ^ henselExponentPlaintext)), factors_m);
-    liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
-    lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..henselExponentCiphertext]];
+    additionConstant := (p ^ (henselExponentCiphertext - henselExponentPlaintext) div 2) * SumPowerfulBasis(factors_m);
+
+    // Generate required polynomials
+    if (henselExponentCiphertext eq 2) and (p ne 2) then
+        liftingPolynomial := []; lowestDigitRetainPolynomials := [];
+        lowestDigitRemovalPolynomialOverRange := GetLowestDigitRemovalPolynomialOverRange(p, B);
+    else
+        liftingPolynomial := GetLiftingPolynomial(p, henselExponentCiphertext - 1);
+        lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) :
+                                         iteration in [1..henselExponentCiphertext]];
+        lowestDigitRemovalPolynomialOverRange := [];
+    end if;
 
     return <rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
             adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
-            liftingPolynomial, lowestDigitRetainPolynomials>;
+            liftingPolynomial, lowestDigitRetainPolynomials, lowestDigitRemovalPolynomialOverRange>;
 end function;
 
 // Decode all variables necessary for the recryption procedure
 function DecodeRecryptVariables(variables)
     return variables[1], variables[2], variables[3], variables[4], variables[5], variables[6], variables[7], variables[8],
-           variables[9], variables[10], variables[11], variables[12];
+           variables[9], variables[10], variables[11], variables[12], variables[13];
 end function;
 
 if p mod 4 eq 1 then    // Non-cyclic case
@@ -228,7 +259,7 @@ function GenerateSwitchKeysRecrypt(sk)
     Append(~rotationSwitchKeysAhead, MatMulGeneralBabyGiantSwitchKeys(sk, [(5 ^ (m div (4 * dim_size))) mod m], [dim_size]));
 
     // Generate unpacking keys
-    unpackingKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    unpackingKeys := [GenSwitchKey(sk, Modexp(p, d div (2 ^ i), m)) : i in [1..Valuation(d, 2)]];
     return rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys;
 end function;
 
@@ -309,8 +340,9 @@ end function;
 function Recrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
-    liftingPolynomial, lowestDigitRetainPolynomials := DecodeRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys,
+    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeRecryptVariables(recrypt_variables);
 
     // Compute generators
     dimensions := [GetNbDimensions(), 1]; first_generators, first_dim_sizes := ComputeGenSizes(dimensions);
@@ -343,10 +375,15 @@ function Recrypt(c, recrypt_variables)
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     for ind := 1 to #unpacked_u do
-        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
-                                                                  henselExponentCiphertext - GetHenselExponent(c),
-                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                              div_pFunc, lowestDigitRetainPolynomials);
+        if (henselExponentCiphertext eq 2) and (p ne 2) then
+            unpacked_u[ind] := BoundedRangeDigitExtraction(unpacked_u[ind], addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+        else
+            unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], henselExponentCiphertext,
+                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                  div_pFunc, lowestDigitRetainPolynomials);
+        end if;
     end for;
 
     // Repack the slots
@@ -394,7 +431,7 @@ function GenerateSwitchKeysRecrypt(sk)
     Append(~rotationSwitchKeysAhead, MatMulGeneralBabyGiantSwitchKeys(sk, [(5 ^ (m div (4 * dim_size))) mod m], [dim_size]));
 
     // Generate unpacking keys
-    unpackingKeys := [GenSwitchKey(sk, p ^ (d div (2 ^ i))) : i in [1..Valuation(d, 2)]];
+    unpackingKeys := [GenSwitchKey(sk, Modexp(p, d div (2 ^ i), m)) : i in [1..Valuation(d, 2)]];
     return rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys;
 end function;
 
@@ -478,8 +515,9 @@ end function;
 function Recrypt(c, recrypt_variables)
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
-    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys, additionConstant,
-    liftingPolynomial, lowestDigitRetainPolynomials := DecodeRecryptVariables(recrypt_variables);
+    adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD, unpackingKeys,
+    additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
+    lowestDigitRemovalPolynomialOverRange := DecodeRecryptVariables(recrypt_variables);
 
     // Compute generators
     first_generators, first_dim_sizes := ComputeGenSizes([1]);
@@ -511,10 +549,15 @@ function Recrypt(c, recrypt_variables)
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     for ind := 1 to #unpacked_u do
-        unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], p, henselExponentCiphertext,
-                                                                  henselExponentCiphertext - GetHenselExponent(c),
-                                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                              div_pFunc, lowestDigitRetainPolynomials);
+        if (henselExponentCiphertext eq 2) and (p ne 2) then
+            unpacked_u[ind] := BoundedRangeDigitExtraction(unpacked_u[ind], addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                           div_pFunc, lowestDigitRemovalPolynomialOverRange);
+        else
+            unpacked_u[ind] := OurDigitExtraction(unpacked_u[ind], henselExponentCiphertext,
+                                                  henselExponentCiphertext - GetHenselExponent(c),
+                                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                  div_pFunc, lowestDigitRetainPolynomials);
+        end if;
     end for;
 
     // Repack the slots

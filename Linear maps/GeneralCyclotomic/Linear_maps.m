@@ -159,7 +159,7 @@ function UnpackConstants(henselExponent)
     inputs := [Zx | ];
     outputs := [Zx | ];
     for equation := 0 to d - 1 do
-        Append(~inputs, Evaluate(GetNormalElement(), y ^ (p ^ equation)));
+        Append(~inputs, Evaluate(GetNormalElement(), y ^ Modexp(p, equation, m)));
         Append(~outputs, equation eq 0 select 1 else 0);
     end for;
 

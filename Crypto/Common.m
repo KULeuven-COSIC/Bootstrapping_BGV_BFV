@@ -1,5 +1,8 @@
 // Common functionality for the BGV and BFV scheme
 //--------------------------
+load "Crypto/General.m";
+load "Arithmetic/FFT.m";
+load "Arithmetic/Powerful.m";
 load "Crypto/Hypercube_structure.m";
 
 /*****
@@ -29,13 +32,13 @@ forward HomomorphicInnerProduct;
 
 // Check whether the given variable is a ciphertext
 function IsCiphertext(c)
-    return Category(c) eq Category(<[Zx | ], 0, 0, R!0>);
+    return Category(c) eq Tup;
 end function;
 
 // Return a new ciphertext that encrypts the constant 0
 function GetZeroCiphertext(c)
     q := GetDefaultModulus();
-    if Category(c) eq Category(0) then
+    if Category(c) eq RngIntElt then
         return <[Zx | 0], c, q, R!0>;
     else
         return <[Zx | 0], c[2], q, R!0>;
@@ -180,8 +183,7 @@ end function;
 // The maximum of the entries of the error polynomial in the canonical embedding
 // The error is normalized to the standard modulus q
 function ErrorCanC(c, sk)
-    errPol := CiphertextErrorPol(c, sk);    // Compute only once
-    return R!(Log(2, (q / c[3]) * MaximumOrOne([Modulus(Evaluate(errPol, xi ^ pow)) : pow in [0..m - 1] | GCD(pow, m) eq 1])));
+    return R!(Log(2, (q / c[3]) * MaximumOrOne(GetMaxModulus(CiphertextErrorPol(c, sk)))));
 end function;
 
 // Estimated error of the given ciphertext
@@ -228,7 +230,7 @@ end function;
 
 // Get the representative of (Z/mZ)*/<p> based on the set S and the given (hypercube) index
 function GetHypercubeRepresentative(index)
-    if Category(index) eq Category(0) then
+    if Category(index) eq RngIntElt then
         index := IndexToHypercube(index);
     end if;
 
@@ -313,6 +315,94 @@ function RecombPoly()
     return recombPolyLarge, recombPolySmall;
 end function;
 
+// Get the plaintext part at the given (hypercube) index
+function GetFromSlot(plaintext, index: henselExponent := e)
+    assert henselExponent le e;
+
+    if Category(index) ne RngIntElt then
+        index := HypercubeToIndex(index);
+    end if;
+
+    // Construct ring modulo the factor of the first slot
+    Zt_F1<y> := GetSlotAlgebra(henselExponent);
+    slotRepresentation := Zx!(plaintext mod factors[index]);
+    return Zx!Evaluate(slotRepresentation, y ^ GetHypercubeRepresentative(index));
+end function;
+
+// Convert each plaintext part to the power basis of x ^ h where h is its hypercube representative
+y_powers := [Zt_poly | (quo<Zt_poly | factors[slot]>.1) ^ GetInverseHypercubeRepresentative(slot) : slot in [1..l]];
+function GetSlotRepresentation(parts, henselExponent)
+    slotRepresentation := [Zx | ];
+    for slot := 1 to l do
+        Zt_slot<y> := quo<Zt_poly | factors[slot]>;
+        Append(~slotRepresentation, Evaluate(Zx!parts[slot], Zt_slot!y_powers[slot]));
+    end for;
+    return [Zx | el mod (p ^ henselExponent) : el in slotRepresentation];
+end function;
+
+assert (not useFFTBatchEncoder) or IsPowerOfTwo(m);
+if useFFTBatchEncoder then
+
+// Precomputation for FFT-based batch encoder
+function PrecompBatchEncoder(m, generating_poly)
+    rootFFTBatcher, generating_poly, root_in_base_ring := ComputeBluesteinRoot(m, p, e, generating_poly);
+    fft_ring := quo<Zt_poly | generating_poly>;                             // Ring for FFT algorithm
+    precomp_batcher := PrecompBluestein(m, fft_ring: W := Evaluate(rootFFTBatcher, fft_ring.1));
+    batcher_info := [<GCD(i, m) eq 1, 0, fft_ring!0> : i in [0..m - 1]];    // Store batcher info
+    for slot := 1 to l do
+        hyper_rep := GetHypercubeRepresentative(slot);
+        for exp := 0 to Order(Integers(m)!p) - 1 do
+            pow := Z!((Integers(m)!p) ^ exp); ind := ((hyper_rep * pow) mod m) + 1;
+            batcher_info[ind][2] := slot; batcher_info[ind][3] := (Evaluate(rootFFTBatcher, fft_ring.1) ^ 2) ^ (ind - 1);
+        end for;
+    end for;
+    return precomp_batcher, batcher_info, root_in_base_ring;
+end function;
+decimation_factor := (p mod 4 eq 1) select d else d div 2; m_prime := m div decimation_factor;
+precomp_batcher, batcher_info, root_in_base_ring := PrecompBatchEncoder(m_prime, DecimatePolynomial(GetFirstSlotFactor(),
+                                                                                                    decimation_factor));
+
+// Embed the given sequence of plaintext parts in the plaintext slots
+// Advanced implementation based on FFT
+function EmbedInSlots(parts: henselExponent := e)
+    assert henselExponent le e;
+
+    // Compute slot representation and split in subpolynomials
+    slotRepresentation := GetSlotRepresentation(parts, henselExponent); fft_inv_res := [Zx | ];
+    splittedRepresentation := [SplitPolynomial(polynomial, decimation_factor) : polynomial in slotRepresentation];
+    for index := 1 to decimation_factor do
+        input := [batcher_info[i][1] select Evaluate(splittedRepresentation[batcher_info[i][2]][index], batcher_info[i][3])
+                                     else 0 : i in [1..m_prime]];
+
+        // Compute inverse FFT and convert to polynomial
+        Append(~fft_inv_res, BluesteinFFTInv(input, precomp_batcher));
+    end for;
+
+    // Combine polynomials to get final result
+    return (CombinePolynomials(fft_inv_res) mod f) mod (p ^ henselExponent);
+end function;
+
+// Get all plaintext parts
+// Advanced implementation based on FFT
+function GetPlaintextParts(plaintext: henselExponent := e)
+    assert henselExponent le e;
+
+    // Compute evaluation in roots of unity and select necessary values
+    sub_polynomials := SplitPolynomial(plaintext, decimation_factor); acc := [Zx | 0 : i in [1..l]];
+    for index := 1 to decimation_factor do
+        fft_res := BluesteinFFT(CatZeros(Eltseq(sub_polynomials[index]), m_prime), precomp_batcher);
+        res := [ExpandPolynomial(Zx!fft_res[(GetHypercubeRepresentative(slot) mod m_prime) + 1], decimation_factor) :
+                slot in [1..l]];
+        for slot := 1 to l do   // Accumulate and replace x ^ 2 by x if necessary
+            acc[slot] +:= (x ^ (((index - 1) * GetHypercubeRepresentative(slot)) mod m)) *
+                          (root_in_base_ring select res[slot] else DecimatePolynomial(res[slot], 2));
+        end for;
+    end for;
+    return [Zx | (el mod GetFirstSlotFactor()) mod (p ^ henselExponent) : el in acc];
+end function;
+
+else
+
 // Precomputed data for inverse CRT
 recombPolyLarge, recombPolySmall := RecombPoly();
 
@@ -323,42 +413,22 @@ function InverseCRT(slotRepresentation, henselExponent)
 end function;
 
 // Embed the given sequence of plaintext parts in the plaintext slots
+// Naive implementation based on Chinese remainder theorem
 function EmbedInSlots(parts: henselExponent := e)
     assert henselExponent le e;
 
-    slotRepresentation := [Zx | ];
-    for slot := 1 to l do
-        // Construct ring modulo the factor of the slot
-        Zt_slot<y> := quo<Zt_poly | factors[slot]>;
-
-        // Apply inverse automorphism to compute representation in slot
-        exp := GetInverseHypercubeRepresentative(slot);
-        Append(~slotRepresentation, Evaluate(Zx!parts[slot], y ^ exp));
-    end for;
-
-    return InverseCRT(slotRepresentation, henselExponent);
-end function;
-
-// Get the plaintext part at the given (hypercube) index
-function GetFromSlot(plaintext, index: henselExponent := e)
-    assert henselExponent le e;
-
-    if Category(index) ne Category(0) then
-        index := HypercubeToIndex(index);
-    end if;
-
-    // Construct ring modulo the factor of the first slot
-    Zt_F1<y> := GetSlotAlgebra(henselExponent);
-    slotRepresentation := Zx!(plaintext mod factors[index]);
-    return Zx!Evaluate(slotRepresentation, y ^ GetHypercubeRepresentative(index));
+    return InverseCRT(GetSlotRepresentation(parts, henselExponent), henselExponent);
 end function;
 
 // Get all plaintext parts
+// Naive implementation based on Chinese remainder theorem
 function GetPlaintextParts(plaintext: henselExponent := e)
     assert henselExponent le e;
 
     return [GetFromSlot(plaintext, index: henselExponent := henselExponent) : index in [1..l]];
 end function;
+
+end if;
 
 
 
@@ -426,24 +496,15 @@ end function;
 // - If hypercube index is given: perform 'rotation', but not yet taking into
 //   account that slots might leak to different hypercolumns in bad dimensions
 function ApplyAutomorphism(element, qi, exp_hyperIndex)
-    if Category(exp_hyperIndex) ne Category(0) then
+    if Category(exp_hyperIndex) ne RngIntElt then
         exp_hyperIndex := GetInverseHypercubeRepresentative(exp_hyperIndex);
     end if;
 
-    // Convert to doubleCRT representation
-    nbPrimes := Ceiling(Log(qi * expansion_automorphism) / Log(minModulus));
-    doubleCRT := PolynomialToDoubleCRT(element: level := nbPrimes);
-
-    // Automorphism is just swapping some elements
-    autoDoubleCRT := [[] : i in [1..#doubleCRT]];
-    for currentExponent := 0 to m - 1 do
-        if GCD(currentExponent, m) eq 1 then
-            for ind := 1 to #doubleCRT do
-                autoDoubleCRT[ind][currentExponent + 1] := doubleCRT[ind][((exp_hyperIndex * currentExponent) mod m) + 1];
-            end for;
-        end if;
+    element := Eltseq(element); res := [0 : i in [1..m]];
+    for index := 1 to #element do
+        res[(((index - 1) * exp_hyperIndex) mod m) + 1] +:= element[index];
     end for;
-    return CenteredReduction(DoubleCRTToPolynomial(autoDoubleCRT), partialModuli[nbPrimes]) mod qi;
+    return ((Zx!res) mod f) mod qi;
 end function;
 
 // Apply an automorphism to the given ciphertext based on the given exponent or hypercube index

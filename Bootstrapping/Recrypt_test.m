@@ -11,14 +11,17 @@ sk, pk := GenKeyPair();
 
 // Message to recrypt
 msq := RandPol(p ^ r);
+csq := Encrypt(msq, p ^ r, pk);
 if scheme eq "BFV" then
-    csq := ModSwitch(Encrypt(msq, p ^ r, pk), 2 ^ 100);                                         // BFV
+    if enableModSwitch then
+        csq := ModSwitch(csq, 2 ^ 100);                                     // BFV
+    end if;
 else
-    csq := ModSwitch(Encrypt(msq, p ^ r, pk), baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
+    csq := ModSwitch(csq, baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
 end if;
 
 // Bootstrapping info
-recrypt_variables := GenerateRecryptVariables(sk, pk, r, e);
+recrypt_variables := GenerateRecryptVariables(sk, pk, r, e, B);
 
 // Test recryption
 t := Cputime();

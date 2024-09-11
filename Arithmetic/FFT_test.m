@@ -1,4 +1,5 @@
-load "CRT/FFT.m";
+load "Crypto/General.m";
+load "Arithmetic/FFT.m";
 
 // Test Bluestein FFT
 function TestBluesteinFFT1()
@@ -7,7 +8,7 @@ function TestBluesteinFFT1()
     m := 31;
 
     // Precomputations
-    precomp := PrecompBluestein(m, p);
+    precomp := PrecompBluestein(m, GF(p));
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
@@ -15,20 +16,20 @@ function TestBluesteinFFT1()
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT
-    test_forward := simpleFFT eq BluesteinFFT(x, m, p, precomp);
-    test_backward := BluesteinFFTInv(simpleFFT, m, p, precomp) eq x;
+    test_forward := simpleFFT eq BluesteinFFT(x, precomp);
+    test_backward := BluesteinFFTInv(simpleFFT, precomp) eq x;
 
     return test_forward and test_backward;
 end function;
 
-// Test Bluestein FFT for power of 2
+// Test Bluestein FFT for power of two
 function TestBluesteinFFT2()
     // Note that p - 1 divisible by 2 ^ n for n = 40 so anything less is fine
     p := 64113622527246337;
     m := 2^7;
 
     // Precomputations
-    precomp := PrecompBluestein(m, p);
+    precomp := PrecompBluestein(m, GF(p));
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
@@ -36,8 +37,8 @@ function TestBluesteinFFT2()
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT
-    test_forward := simpleFFT eq BluesteinFFT(x, m, p, precomp);
-    test_backward := BluesteinFFTInv(simpleFFT, m, p, precomp) eq x;
+    test_forward := simpleFFT eq BluesteinFFT(x, precomp);
+    test_backward := BluesteinFFTInv(simpleFFT, precomp) eq x;
 
     return test_forward and test_backward;
 end function;
@@ -49,7 +50,7 @@ function TestBluesteinFFT3()
     m := 2^3 * 31;
 
     // Precomputations
-    precomp := PrecompBluestein(m, p);
+    precomp := PrecompBluestein(m, GF(p));
     omega := precomp[1] ^ 2;
 
     // Random vector of elements to take FFT
@@ -57,8 +58,8 @@ function TestBluesteinFFT3()
     simpleFFT := [Z | &+[x[i + 1] * omega ^ (k * i) : i in [0..m - 1]] : k in [0..m - 1]];
 
     // Test forward and backward FFT
-    test_forward := simpleFFT eq BluesteinFFT(x, m, p, precomp);
-    test_backward := BluesteinFFTInv(simpleFFT, m, p, precomp) eq x;
+    test_forward := simpleFFT eq BluesteinFFT(x, precomp);
+    test_backward := BluesteinFFTInv(simpleFFT, precomp) eq x;
 
     return test_forward and test_backward;
 end function;

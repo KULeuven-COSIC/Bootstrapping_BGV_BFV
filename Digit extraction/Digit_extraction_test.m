@@ -110,15 +110,11 @@ c := Encrypt(m, p ^ e, pk);
 
 liftingPolynomial := GetLiftingPolynomial(p, e - 1);
 lowestDigitRetainPolynomials := [GetLowestDigitRetainPolynomial(p, iteration) : iteration in [1..e]];
-result1 := HaleviShoupDigitExtraction(c, p, e, v,
-                                      addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+result1 := HaleviShoupDigitExtraction(c, p, e, v, addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
                                       div_pFunc, liftingPolynomial);
-result2 := ChenHanDigitExtraction(c, p, e, v,
-                                  addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
-                                  div_pFunc, liftingPolynomial,
-                                  lowestDigitRetainPolynomials);
-result3 := OurDigitExtraction(c, p, e, v,
-                              addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+result2 := ChenHanDigitExtraction(c, p, e, v, addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
+                                  div_pFunc, liftingPolynomial, lowestDigitRetainPolynomials);
+result3 := OurDigitExtraction(c, e, v, addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
                               div_pFunc, lowestDigitRetainPolynomials);
 res := HaleviShoupDigitExtraction(m, p, e, v, func<x, y | (x + y) mod (p ^ e)>, func<x, y | (x - y) mod (p ^ e)>,
                                               func<x, y | (x * y) mod (p ^ e)>,

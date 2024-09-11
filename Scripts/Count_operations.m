@@ -1,8 +1,9 @@
 // Count the number of basic homomorphic operations for the decomposed slot-to-coefficient
 // transformation for power-of-two cyclotomics
 // The count corresponds to the behaviour implemented in 'Linear maps/PowerOfTwo'
-load "Crypto/BFV/BFV.m";
-load "Linear maps/PowerOfTwo/Linear_maps.m";
+forward GetDimensionSize; d := 0;   // Specify dummy variables
+load "Crypto/General.m";
+load "Linear maps/General.m";
 
 m := 2^16;                      // m-th cyclotomic polynomial
 n := EulerPhi(m);               // Degree of f(x)
