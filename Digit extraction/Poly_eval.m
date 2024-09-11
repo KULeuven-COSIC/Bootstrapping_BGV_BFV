@@ -247,11 +247,20 @@ function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x
         end if;
     end for;
 
+    if IsCiphertext(element) then
+        SetOptimalCoefficientDomain();
+    end if;
+
     // Compute preprocessing step and find best parameters for remaining polynomials
     polynomials, element := PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc);
     m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth, ring := ring);
 
     // Return single element if the polynomial was given in this format
     result := PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd);
+
+    if IsCiphertext(element) then
+        SetOptimalNTTDomain();
+    end if;
+
     return isSequence select result else result[1];
 end function;

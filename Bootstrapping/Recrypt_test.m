@@ -29,8 +29,10 @@ res := Recrypt(csq, recrypt_variables);
 
 "";
 "Time for bootstrapping", Cputime(t);
-"Test bootstrapping", Decrypt(res, sk) eq msq;
+"Test bootstrapping", Decrypt(res, sk: print_result := false, check_correctness := true, expected_result := msq) eq msq;
 "Total noise in bootstrapped ciphertext", ErrorC(res, sk);
 
 "Error after bootstrapping on canonical embedding", ErrorCanC(res, sk);
 "Estimated error after bootstrapping on canonical embedding", EstimatedErrorCanC(res);
+
+load "Traces/Post_processing.m";

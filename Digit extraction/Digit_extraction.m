@@ -184,5 +184,9 @@ end function;
 // Digit extraction algorithm over bounded range
 // This is the algorithm from Ma et al. for e = 2 and p > 2
 function BoundedRangeDigitExtraction(u, addFunc, mulFunc, div_pFunc, lowestDigitRemovalPolynomialOverRange)
-    return div_pFunc(PolyEval(lowestDigitRemovalPolynomialOverRange, u, addFunc, mulFunc));
+    if IGNORE_DIGIT_EXTRACTION then
+        return div_pFunc(mulFunc(u, p));
+    else
+        return div_pFunc(PolyEval(lowestDigitRemovalPolynomialOverRange, u, addFunc, mulFunc: optimal_depth := true));
+    end if;
 end function;

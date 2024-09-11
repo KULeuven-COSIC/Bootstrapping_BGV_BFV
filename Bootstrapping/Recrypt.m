@@ -350,8 +350,14 @@ function Recrypt(c, recrypt_variables)
     dim := GetNbDimensions() - 1; new_dim_sizes := [d * GetDimensionSize(dim)];
     new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
 
+    timer_inner_product := StartTiming();
+
     // Start with homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_first_lt := StartTiming();
 
     // Last stage merged with M
     u := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], new_generators, new_dim_sizes,
@@ -368,9 +374,17 @@ function Recrypt(c, recrypt_variables)
     // First stage merged with M^(-1)
     u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], first_generators,
                                             first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
+    
+    PrintNoiseBudget(u: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_unpack := StartTiming();
 
     // Unpack the slots
     unpacked_u := UnpackSlotsPowerOfTwo(u, unpackingKeys);
+
+    PrintNoiseBudget(unpacked_u[1]: message := "after unpacking");
+    StopTiming(timer_unpack: message := "unpacking");
+    timer_digit_extract := StartTiming();
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
@@ -386,8 +400,16 @@ function Recrypt(c, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(unpacked_u[1]: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    timer_repack := StartTiming();
+
     // Repack the slots
     u := RepackSlotsPowerOfTwo(unpacked_u);
+
+    PrintNoiseBudget(u: message := "after repacking");
+    StopTiming(timer_repack: message := "repacking");
+    timer_second_lt := StartTiming();
 
     // First stage merged with M
     u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalConstantsAhead[1], adapted_evalConstantsBack[1], first_generators,
@@ -401,8 +423,11 @@ function Recrypt(c, recrypt_variables)
 
     // Last stage merged with M^(-1)
     dim := GetNbDimensions() - 1;
-    return MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
+    res := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
                                                rotationSwitchKeysAhead[dim]);
+    PrintNoiseBudget(res: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    return res;
 end function;
 
 else    // Cyclic case
@@ -525,8 +550,14 @@ function Recrypt(c, recrypt_variables)
     dim := GetNbDimensions(); new_dim_sizes := [(d div 2) * GetDimensionSize(dim)];
     new_generators := [(5 ^ (m div (4 * new_dim_sizes[1]))) mod m];
 
+    timer_inner_product := StartTiming();
+
     // Start with homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_first_lt := StartTiming();
 
     // Last stage merged with M
     u := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalInvConstantsAhead[dim], new_generators, new_dim_sizes,
@@ -543,8 +574,16 @@ function Recrypt(c, recrypt_variables)
     u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], first_generators,
                                             first_dim_sizes, 1, rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
 
+    PrintNoiseBudget(u: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_unpack := StartTiming();
+
     // Unpack the slots
     unpacked_u := UnpackSlotsPowerOfTwo(u, unpackingKeys);
+
+    PrintNoiseBudget(unpacked_u[1]: message := "after unpacking");
+    StopTiming(timer_unpack: message := "unpacking");
+    timer_digit_extract := StartTiming();
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
@@ -560,8 +599,16 @@ function Recrypt(c, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(unpacked_u[1]: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    timer_repack := StartTiming();
+
     // Repack the slots
     u := RepackSlotsPowerOfTwo(unpacked_u);
+
+    PrintNoiseBudget(u: message := "after repacking");
+    StopTiming(timer_repack: message := "repacking");
+    timer_second_lt := StartTiming();
 
     // First stage merged with M
     u := MatMulGeneralBadDimensionBabyGiant(u, adapted_evalConstantsAhead[1], adapted_evalConstantsBack[1], first_generators,
@@ -574,8 +621,11 @@ function Recrypt(c, recrypt_variables)
 
     // Last stage merged with M^(-1)
     dim := GetNbDimensions();
-    return MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
+    res := MatMulGeneralGoodDimensionBabyGiant(u, adapted_evalConstantsAhead[dim], new_generators, new_dim_sizes,
                                                rotationSwitchKeysAhead[dim]);
+    PrintNoiseBudget(res: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    return res;
 end function;
 
 end if;

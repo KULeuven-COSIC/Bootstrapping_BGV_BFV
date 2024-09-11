@@ -100,12 +100,14 @@ function MatMulBabyGiant(c, adapted_constants, switchKeys)
         end for;
 
         // Compute outer sum
+        SetOptimalCoefficientDomain();
         if k eq 1 then
             w := Add(w, tmp);
         else
             rot_size := [g_seq[ind] * k_seq[ind] : ind in [1..#g_seq]];
             w := Add(w, ApplyAutomorphismCiphertext(tmp, rot_size, switchKeys[HypercubeToIndex(rot_size) - 1]));
         end if;
+        SetOptimalNTTDomain();
     end for;
     return w;
 end function;
@@ -249,6 +251,7 @@ function MatMulGeneralGoodDimensionBabyGiant(c, adapted_constants, generators, d
         end for;
 
         // Compute outer sum
+        SetOptimalCoefficientDomain();
         if k eq 1 then
             w := Add(w, tmp);
         else
@@ -256,6 +259,7 @@ function MatMulGeneralGoodDimensionBabyGiant(c, adapted_constants, generators, d
             w := Add(w, ApplyAutomorphismCiphertext(tmp, RotToExp(generators, rot_size),
                                                     switchKeys[SequenceToIndex(rot_size, dim_sizes) - 1]));
         end if;
+        SetOptimalNTTDomain();
     end for;
     return w;
 end function;
@@ -400,6 +404,7 @@ function MatMulGeneralBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_c
         end for;
 
         // Compute outer sum
+        SetOptimalCoefficientDomain();
         if k eq 1 then
             w := Add(w, tmp);
         else
@@ -407,6 +412,7 @@ function MatMulGeneralBadDimensionBabyGiant(c, adapted_constantsAhead, adapted_c
             w := Add(w, ApplyAutomorphismCiphertext(tmp, RotToExp(generators, rot_size),
                                                     switchKeysAhead[SequenceToIndex(rot_size, dim_sizes) - 1]));
         end if;
+        SetOptimalNTTDomain();
     end for;
     return w;
 end function;
@@ -456,6 +462,7 @@ end function;
 
 // Unpack the slots of the given ciphertext
 function UnpackSlotsPowerOfTwo(c, switchKeys)
+    SetOptimalCoefficientDomain();
     result := [c];
 
     // Usual iterations
@@ -477,11 +484,13 @@ function UnpackSlotsPowerOfTwo(c, switchKeys)
             Append(~result, MulConstant(Sub(ctxt, auto_ctxt), -(x ^ (n div 2))));
         end for;
     end if;
+    SetOptimalNTTDomain();
     return result;
 end function;
 
 // Repack the slots of the given sequence of ciphertexts
 function RepackSlotsPowerOfTwo(c_seq)
+    SetOptimalCoefficientDomain();
     result := c_seq;
 
     // One extra iteration is necessary with larger exponent
@@ -500,5 +509,6 @@ function RepackSlotsPowerOfTwo(c_seq)
             Append(~result, Add(tmp[2 * index - 1], MulConstant(tmp[2 * index], x ^ (2 ^ (top - i)))));
         end for;
     end for;
+    SetOptimalNTTDomain();
     return result[1];
 end function;

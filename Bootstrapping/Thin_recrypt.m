@@ -409,6 +409,9 @@ function ThinRecrypt(c, recrypt_variables)
     additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
     lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
+    PrintNoiseBudget(c: message := "initial");
+    timer_first_lt := StartTiming();
+
     // First stage
     dimensions := [GetNbDimensions(), 1];
     c := MatMul2DBadDimensionBabyGiant(c, adapted_evalConstantsAhead[1], adapted_evalConstantsBack[1], dimensions,
@@ -424,11 +427,23 @@ function ThinRecrypt(c, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(c: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_inner_product := StartTiming();
+
     // Homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
 
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_trace := StartTiming();
+
     // Evaluate trace to subring that encodes sparse plaintexts
     u := EvaluateTrace(u, traceKeys);
+
+    PrintNoiseBudget(u: message := "after trace");
+    StopTiming(timer_trace: message := "trace");
+    timer_second_lt := StartTiming();
 
     // Other stages
     dim := GetNbDimensions() - 1;
@@ -446,16 +461,23 @@ function ThinRecrypt(c, recrypt_variables)
     u := MatMul2DBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], dimensions,
                                        rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
 
+    PrintNoiseBudget(u: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    timer_digit_extract := StartTiming();
+
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     if (henselExponentCiphertext eq 2) and (p ne 2) then
-        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+        res := BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
                                            div_pFunc, lowestDigitRemovalPolynomialOverRange);
     else
-        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+        res := OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
                                   addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
                                   div_pFunc, lowestDigitRetainPolynomials);
     end if;
+    PrintNoiseBudget(res: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    return res;
 end function;
 
 else    // Cyclic case
@@ -529,6 +551,9 @@ function ThinRecrypt(c, recrypt_variables)
     additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
     lowestDigitRemovalPolynomialOverRange := DecodeThinRecryptVariables(recrypt_variables);
 
+    PrintNoiseBudget(c: message := "initial");
+    timer_first_lt := StartTiming();
+
     for dim := 1 to GetNbDimensions() do
         if dim eq GetNbDimensions() then
             c := MatMul1DGoodDimensionBabyGiant(c, adapted_evalConstantsAhead[dim], dim, rotationSwitchKeysAhead[dim]);
@@ -538,11 +563,23 @@ function ThinRecrypt(c, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(c: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_inner_product := StartTiming();
+
     // Homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
 
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_trace := StartTiming();
+
     // Evaluate trace to subring that encodes sparse plaintexts
     u := EvaluateTrace(u, traceKeys);
+
+    PrintNoiseBudget(u: message := "after trace");
+    StopTiming(timer_trace: message := "trace");
+    timer_second_lt := StartTiming();
 
     dim := GetNbDimensions();
     while dim ge 1 do
@@ -555,19 +592,30 @@ function ThinRecrypt(c, recrypt_variables)
         dim -:= 1;
     end while;
 
+    PrintNoiseBudget(u: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    timer_slot_wise_trace := StartTiming();
+
     // Remove imaginary part from slots
     u := Add(u, ApplyAutomorphismCiphertext(u, p, traceKeys[#traceKeys]));
+
+    PrintNoiseBudget(u: message := "after slot-wise trace");
+    StopTiming(timer_slot_wise_trace: message := "slot-wise trace");
+    timer_digit_extract := StartTiming();
 
     // Digit extraction
     henselExponentCiphertext := GetHenselExponent(bootKey);
     if (henselExponentCiphertext eq 2) and (p ne 2) then
-        return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+        res := BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
                                            div_pFunc, lowestDigitRemovalPolynomialOverRange);
     else
-        return OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
+        res := OurDigitExtraction(u, henselExponentCiphertext, henselExponentCiphertext - GetHenselExponent(c),
                                   addFunc, subFunc, func<x, y | mulFunc(x, y, rk)>,
                                   div_pFunc, lowestDigitRetainPolynomials);
     end if;
+    PrintNoiseBudget(res: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    return res;
 end function;
 
 end if;

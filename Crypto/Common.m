@@ -27,6 +27,7 @@ forward KeySwitch;
 forward CiphertextErrorPol;
 forward ExactDivisionBy;
 forward HomomorphicInnerProduct;
+forward CopyCiphertext;
 
 
 
@@ -118,51 +119,139 @@ end procedure;
 
 
 
+function GetPlaintextModulus(ciphertext)
+    return ciphertext[2];
+end function;
+
+function IsHighLevel(ciphertext)
+    return GetPlaintextModulus(ciphertext) eq p ^ e;
+end function;
+
+function GetHighLevelBit(ciphertext)
+    return IsHighLevel(ciphertext) select "1" else "0";
+end function;
+
+
+
+SetAutoColumns(false);
+SetColumns(0);
+
+load "Traces/Hash.m";
+load "Traces/Helpers.m";
+
+
+
 // Addition
-function Add(c1, c2)
+function Add(c1, c2: print_result := true)
     assert c1[2] eq c2[2];  // Plaintext moduli should be equal
+    if IsZero(c1) then
+        return c2;
+    elif IsZero(c2) then
+        return c1;
+    end if;
+    hash1 := MyHash(c1); hash2 := MyHash(c2);
 
     // Ciphertexts should have same modulus and degree
     ModSwitchLowestModulus(~c1, ~c2);
     PadZeros(~c1, ~c2);
-    return <[(c1[1][i] + c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>;
+    res := CopyCiphertext(<[(c1[1][i] + c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>:
+                          print_result := false);
+    if print_result then
+        hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.add(*" cat hash1 cat ", *" cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        UseCiphertext(hash1); UseCiphertext(hash2);
+    end if;
+    return res;
 end function;
 
 // Subtraction
-function Sub(c1, c2)
+function Sub(c1, c2: print_result := true)
     assert c1[2] eq c2[2];  // Plaintext moduli should be equal
+    if IsZero(c2) then
+        return c1;
+    end if;
+    hash1 := MyHash(c1); hash2 := MyHash(c2);
 
     // Ciphertexts should have same modulus and degree
     ModSwitchLowestModulus(~c1, ~c2);
     PadZeros(~c1, ~c2);
-    return <[(c1[1][i] - c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>;
+    res := CopyCiphertext(<[(c1[1][i] - c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>:
+                          print_result := false);
+    if print_result then
+        hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.sub(*" cat hash1 cat ", *" cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        UseCiphertext(hash1); UseCiphertext(hash2);
+    end if;
+    return res;
 end function;
 
 // Multiplication with relinearization
 function Mul(c1, c2, rk)
+    if IsZero(c1) or IsZero(c2) then
+        return GetZeroCiphertext(c1);
+    elif IsOne(c1) then
+        return c2;
+    elif IsOne(c2) then
+        return c1;
+    end if;
+    hash1 := MyHash(c1); hash2 := MyHash(c2);
+
     // Ensure that noise doesn't grow exponentially in multiplicative depth
     AutomaticModSwitchMul(~c1);
     AutomaticModSwitchMul(~c2);
 
     // Perform the multiplication and relinearization
-    mul := MulNR(c1, c2);
+    mul := MulNR(c1, c2: print_result := false);
     if #mul[1] eq 3 then
         AutomaticModSwitchRelin(~mul);
-        mul := Relin(mul, rk);
+        mul := Relin(mul, rk: print_result := false);
     end if;
 
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~mul);
-    return mul;
+    res := CopyCiphertext(mul: print_result := false);
+    hash3 := MyHash(res); CreateCiphertext(hash3);
+    if hash1 eq hash2 then
+        PrintFile(TRACE, "bootstrapper.square(*" cat hash1 cat ", bk, *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+    else
+        PrintFile(TRACE, "bootstrapper.multiply(*" cat hash1 cat ", *" cat hash2 cat ", bk, *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+    end if;
+    UseCiphertext(hash1); UseCiphertext(hash2);
+    return res;
 end function;
 
 // Multiplication with constant
-function MulConstant(c, constant)
+function MulConstant(c, constant: print_result := true)
+    if IsZero(c) or IsZero(constant mod GetPlaintextModulus(c)) then
+        return GetZeroCiphertext(c);
+    elif IsOne(constant mod GetPlaintextModulus(c)) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
     constant := CenteredReduction(constant, c[2]);
-    res := <[((constant * cPart) mod f) mod c[3] : cPart in c[1]], c[2], c[3], SquareSum(constant) * c[4]>;
+    mul := <[((constant * cPart) mod f) mod c[3] : cPart in c[1]], c[2], c[3], SquareSum(constant) * c[4]>;
 
     // Decrease current modulus for efficiency reasons
-    DynamicModSwitch(~res);
+    DynamicModSwitch(~mul);
+    res := CopyCiphertext(mul: print_result := false);
+    if print_result then
+        hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.multiply_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        seq := Eltseq(constant mod GetPlaintextModulus(c));
+        if ((&+[el eq 0 select 0 else 1 : el in seq]) eq 1) and ((&+seq) gt (GetPlaintextModulus(c) div 2)) then
+            PrintFile(TRACE, "bootstrapper.negate_inplace(*" cat hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+            UsePlaintextOptimalDomain(hash2, (-constant) mod GetPlaintextModulus(c), IsHighLevel(res));
+        else
+            UsePlaintextOptimalDomain(hash2, constant mod GetPlaintextModulus(c), IsHighLevel(res));
+        end if;
+        UseCiphertext(hash1);
+    end if;
     return res;
 end function;
 
@@ -509,6 +598,14 @@ end function;
 
 // Apply an automorphism to the given ciphertext based on the given exponent or hypercube index
 function ApplyAutomorphismCiphertext(c, exp_hyperIndex, switchKey)
+    if Category(exp_hyperIndex) ne RngIntElt then
+        exp_hyperIndex := GetInverseHypercubeRepresentative(exp_hyperIndex);
+    end if;
+    if HasDegreeZero(c) or (exp_hyperIndex eq 1) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
     cNew := <[ApplyAutomorphism(cPart, c[3], exp_hyperIndex) : cPart in c[1]], c[2], c[3], c[4]>;
 
     // Perform key switching if necessary
@@ -519,7 +616,13 @@ function ApplyAutomorphismCiphertext(c, exp_hyperIndex, switchKey)
 
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~cNew);
-    return cNew;
+    res := CopyCiphertext(cNew: print_result := false);
+    hash2 := MyHash(res); CreateCiphertext(hash2);
+    PrintFile(TRACE, "bootstrapper.apply_galois(*" cat hash1 cat ", bk, *" cat hash2 cat
+                     ", " cat IntegerToString(exp_hyperIndex) cat ", " cat GetHighLevelBit(res) cat ");");
+    UseCiphertext(hash1);
+    PrintFile(CONSTANTS, IntegerToString(exp_hyperIndex));
+    return res;
 end function;
 
 // Apply an automorphism to the given plaintext based on the given exponent or hypercube index

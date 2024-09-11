@@ -32,8 +32,10 @@ res := ThinRecrypt(csq, recrypt_variables);
 
 "";
 "Time for thin bootstrapping", Cputime(t);
-"Test thin bootstrapping", Decrypt(res, sk) eq msq;
+"Test thin bootstrapping", Decrypt(res, sk: print_result := false, check_correctness := true, expected_result := msq) eq msq;
 "Total noise in bootstrapped ciphertext", ErrorC(res, sk);
 
 "Error after bootstrapping on canonical embedding", ErrorCanC(res, sk);
 "Estimated error after bootstrapping on canonical embedding", EstimatedErrorCanC(res);
+
+load "Traces/Post_processing.m";
