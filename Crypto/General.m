@@ -16,6 +16,10 @@ Zx<x> := PolynomialRing(Z);
 Zt_poly := PolynomialRing(Zt);
 f := Zx!CyclotomicPolynomial(m);
 
+// Cyclotomic field
+Q := Rationals();
+cyclo_field := ext<Q | f>;
+
 // Real and complex numbers used for error estimation
 R := RealField(10);
 C := ComplexField(10);
@@ -53,6 +57,11 @@ function MinAbs(a, b)
     end if;
 end function;
 
+// Concatenate zeros to the given array until it reaches the indicated length
+function CatZeros(seq, length)
+    return seq cat [Z | 0 : i in [1..length - #seq]];
+end function;
+
 // Centered reduction of a sequence mod qi
 function CenteredReductionSequence(seq, qi)
     return [Z | MinAbs(coeff mod qi, (coeff mod qi) - qi) : coeff in seq];
@@ -63,19 +72,46 @@ function CenteredReduction(poly, qi)
     return Zx!CenteredReductionSequence(Eltseq(poly), qi);
 end function;
 
-// Scale and round a sequence over qp/q
-function ScaleAndRoundSequence(seq, qp, q)
-    return [Z | Round(qp*coeff/q) : coeff in seq];
+// Centered reduction of a rational sequence mod 1
+function CenteredReductionRationalSequence(seq)
+    seq := [Q | number - Round(number) : number in seq];
+    return [Q | number eq 1/2 select -1/2 else number : number in seq];
 end function;
 
-// Scale and round a polynomial over qp/q
+// Convert the given integer polynomial to the cyclotomic field
+function ToCyclotomicField(poly)
+    return cyclo_field!CatZeros(Eltseq(poly mod f), n);
+end function;
+
+// Precompute inverses of t^i and p^i
+common_moduli := [ToCyclotomicField(x ^ gbfvExponent - gbfvCoefficient) ^ i : i in [1..e]] cat
+                 [ToCyclotomicField(p) ^ i : i in [1..e]];
+common_inverses := [i eq 1 select ToCyclotomicField(x ^ gbfvExponent - gbfvCoefficient) ^ (-1) else
+                                  Self(i - 1) * Self(1) : i in [1..e]] cat
+                   [i eq 1 select ToCyclotomicField(p) ^ (-1) else Self(i - 1) * Self(1) : i in [1..e]];
+
+// Flatten the given polynomial with respect to t
+function Flatten(poly, t)
+    t := ToCyclotomicField(t);
+    t_inverse := (Index(common_moduli, t) eq 0) select t ^ (-1) else common_inverses[Index(common_moduli, t)];
+    seq := CenteredReductionRationalSequence(Eltseq(ToCyclotomicField(poly) * t_inverse));
+    return Zx!Eltseq(t * (cyclo_field!seq));
+end function;
+
+// Scale and round a sequence over 1/q where q is a scalar
+function ScaleAndRoundSequence(seq, q)
+    return [Z | Round(coeff/q) : coeff in seq];
+end function;
+
+// Scale and round a polynomial over qp/q mod f where qp and q are ring elements
 function ScaleAndRound(poly, qp, q)
-    return Zx!ScaleAndRoundSequence(Eltseq(poly), qp, q);
-end function;
-
-// Concatenate zeros to the given array until it reaches the indicated length
-function CatZeros(seq, length)
-    return seq cat [Z | 0 : i in [1..length - #seq]];
+    if Category(q) eq RngIntElt then    // Optimized implementation
+        return Zx!ScaleAndRoundSequence(Eltseq((poly * qp) mod f), q);
+    else
+        q := ToCyclotomicField(q);
+        q_inverse := (Index(common_moduli, q) eq 0) select q ^ (-1) else common_inverses[Index(common_moduli, q)];
+        return Zx!ScaleAndRoundSequence(Eltseq(ToCyclotomicField(poly) * ToCyclotomicField(qp) * q_inverse), 1);
+    end if;
 end function;
 
 // Compute the sum of the squares of the coefficients of the given polynomial

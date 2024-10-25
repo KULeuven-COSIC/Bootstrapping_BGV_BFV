@@ -27,4 +27,8 @@ noiseBufferRelin := 2^5;          // Buffer for noise level before key switching
 can_max := 1500;                  // To be determined experimentally from 'Scripts/Find_can_max.m' after setting other parameters
 
 // Batch encoding in plaintext slots can be done with naive or FFT-based algorithm
-useFFTBatchEncoder := true;       // Use batch encoder based on FFT algorithm (only possible if m is a power of two)
+useFFTBatchEncoder := false;      // Use batch encoder based on FFT algorithm (only possible if m is a power of two)
+
+// GBFV parameters for binomial plaintext modulus
+gbfvExponent := 1;                // Degree of the GBFV plaintext modulus
+gbfvCoefficient := 2;             // Coefficient of the GBFV plaintext modulus

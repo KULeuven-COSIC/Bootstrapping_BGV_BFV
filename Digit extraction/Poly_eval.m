@@ -85,7 +85,7 @@ function PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc)
         for index := 0 to Degree(polynomials[poly_index]) div spacing do
             Append(~new_seq, old_seq[index * spacing + 1]);
         end for;
-        polynomials[poly_index] := Zx!new_seq;
+        polynomials[poly_index] := Parent(polynomials[poly_index])!new_seq;
     end for;
 
     // Remaining polynomials and evaluation result
@@ -170,7 +170,7 @@ end function;
 
 // Return the parameters that lead to the smallest number of non-scalar multiplications
 // Degree of the polynomials is at most spacing * k * (2 ^ m)
-function GetBestParameters(polynomials: lazy := false, optimal_depth := false, ring := Zx)
+function GetBestParameters(polynomials: lazy := false, optimal_depth := false)
     // We should have a list of polynomials
     _, polynomials := IsPolynomialSequence(polynomials);
 
@@ -191,6 +191,7 @@ function GetBestParameters(polynomials: lazy := false, optimal_depth := false, r
 
     // Take generic polynomials to count number of multiplications
     // This is to ensure that we don't miss any multiplications
+    ring := Parent(polynomials[1]);
     oddPolynomials := [&+[ring | (ring.1)^(2 * i + 1) : i in [0..Degree(polynomial) div 2]] : polynomial in polynomials];
     fullPolynomials := [&+[ring | (ring.1)^i : i in [0..Degree(polynomial)]] : polynomial in polynomials];
 
@@ -235,8 +236,7 @@ end function;
 // - The lazy flag is set to true
 // - An appropriate mulFunc is passed
 // - An appropriate sanitizer is passed
-function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x | x>, lazy := false,
-                                                          optimal_depth := false, ring := Zx)
+function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x | x>, lazy := false, optimal_depth := false)
     // We should have a list of polynomials
     isSequence, polynomials := IsPolynomialSequence(polynomials);
 
@@ -253,7 +253,7 @@ function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x
 
     // Compute preprocessing step and find best parameters for remaining polynomials
     polynomials, element := PolyEvalPreprocessing(polynomials, element, mulFunc, sanitizeFunc);
-    m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth, ring := ring);
+    m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth);
 
     // Return single element if the polynomial was given in this format
     result := PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd);
