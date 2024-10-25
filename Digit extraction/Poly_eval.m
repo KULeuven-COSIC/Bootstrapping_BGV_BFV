@@ -126,7 +126,8 @@ end function;
 
 // Evaluate the given polynomials in the given element using the given parameters
 // This function does not implement preprocessing of the polynomials
-function PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd)
+function PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd:
+                                 is_ciphertext := false)
     // Precompute x ^ exp with exp = 1, ..., k
     xExp1 := [element];
     for exp := 2 to k do
@@ -157,6 +158,9 @@ function PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitiz
 
     // Precompute x ^ exp with exp = k, 2 * k, ..., (2 ^ (m - 1)) * k
     xExp2 := [xExp1[#xExp1]];
+    if (Category(CoefficientRing(Parent(polynomials[1]))) ne RngIntElt) and IsCiphertext(element) and is_ciphertext then
+        xExp2[1] := CopyCiphertext(xExp2[1]);   // Ciphertext belongs to two arrays and should be in different domain
+    end if;
     for exp := 1 to m - 1 do
         Append(~xExp2, sanitizeFunc(mulFunc(xExp2[exp], xExp2[exp])));
     end for;
@@ -247,7 +251,7 @@ function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x
         end if;
     end for;
 
-    if IsCiphertext(element) then
+    if (Category(CoefficientRing(Parent(polynomials[1]))) eq RngIntElt) and IsCiphertext(element) then
         SetOptimalCoefficientDomain();
     end if;
 
@@ -256,9 +260,10 @@ function PolyEval(polynomials, element, addFunc, mulFunc: sanitizeFunc := func<x
     m, k, odd := GetBestParameters(polynomials: lazy := lazy, optimal_depth := optimal_depth);
 
     // Return single element if the polynomial was given in this format
-    result := PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd);
+    result := PolyEvalGivenParameters(polynomials, element, addFunc, mulFunc, sanitizeFunc, optimal_depth, m, k, odd:
+                                      is_ciphertext := true);
 
-    if IsCiphertext(element) then
+    if (Category(CoefficientRing(Parent(polynomials[1]))) eq RngIntElt) and IsCiphertext(element) then
         SetOptimalNTTDomain();
     end if;
 

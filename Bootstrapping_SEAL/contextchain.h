@@ -1,5 +1,6 @@
 #pragma once
 #include "seal/seal.h"
+#include "extended_evaluator.h"
 
 using namespace seal;
 
@@ -11,7 +12,7 @@ using namespace seal;
 class ContextChain {
 private:
 	std::vector<SEALContext> contexts;
-	std::vector<std::unique_ptr<Evaluator>> evaluators;
+	std::vector<std::unique_ptr<ExtendedEvaluator>> evaluators;
 	util::Pointer<util::RNSTool> context_switch_rns_tool;
 
 	static void convert_neg_ones(uint64_t* data, size_t len, const Modulus& from, const Modulus& to);
@@ -25,8 +26,8 @@ public:
 	size_t poly_modulus_degree() const;
 	const SEALContext& get_context(parms_id_type parm_id) const;
 	const SEALContext& get_context(size_t i) const;
-	const Evaluator& get_evaluator(parms_id_type parm_id) const;
-	const Evaluator& get_evaluator(size_t i) const;
+	const ExtendedEvaluator& get_evaluator(parms_id_type parm_id) const;
+	const ExtendedEvaluator& get_evaluator(size_t i) const;
 	size_t size() const;
 	size_t get_context_index(parms_id_type parm_id) const;
 
@@ -41,7 +42,7 @@ public:
 	 * modulus p^e
 	*/
 	const SEALContext& target_context() const;
-	const Evaluator& target_evaluator() const;
+	const ExtendedEvaluator& target_evaluator() const;
 
 	/**
 	 * Converts a secret key for one of the contexts to a secret key for the target context

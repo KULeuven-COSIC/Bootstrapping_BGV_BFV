@@ -2,6 +2,8 @@
 #include <string>
 #include "seal/seal.h"
 #include "contextchain.h"
+#include "extended_evaluator.h"
+#include "sparse_key_generator.h"
 
 class Bootstrapper;
 
@@ -16,9 +18,13 @@ private:
 	seal::Ciphertext encrypted_sk;
 	seal::GaloisKeys gk;
 	seal::RelinKeys rk;
+	seal::KSwitchKeys ek1;
+	seal::KSwitchKeys ek2;
 
 	seal::GaloisKeys base_gk;
 	seal::RelinKeys base_rk;
+
+	uint64_t hamming_weight;
 
 	bool is_valid_for(const seal::SEALContext& context) const;
 
@@ -45,7 +51,7 @@ public:
 	ContextChain context_chain;
 	seal::MemoryPoolHandle pool;
 
-	const seal::Evaluator& bootstrapping_evaluator() const;
+	const ExtendedEvaluator& bootstrapping_evaluator() const;
 
 private:
 	/**
@@ -53,7 +59,7 @@ private:
 	*/
 	void homomorphic_noisy_decrypt(const seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, seal::MemoryPoolHandle pool DEBUG_PARAMS) const;
 
-	const seal::Evaluator& get_evaluator(bool high_level) const;
+	const ExtendedEvaluator& get_evaluator(bool high_level) const;
 
 	static const seal::GaloisKeys& get_galois_keys(const BootstrappingKey& bk, bool high_level);
 
@@ -81,12 +87,16 @@ public:
 	void sub_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const;
 
 	void multiply(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, seal::Ciphertext& destination, bool high_level) const;
+	void gbfv_multiply(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void multiply_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, bool high_level) const;
+	void gbfv_multiply_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void multiplyNR(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, seal::Ciphertext& destination, bool high_level) const;
+	void gbfv_multiplyNR(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void multiplyNR_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, bool high_level) const;
+	void gbfv_multiplyNR_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void relinearize(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, bool high_level) const;
 
@@ -97,12 +107,16 @@ public:
 	void multiply_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const;
 
 	void square(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, bool high_level) const;
+	void gbfv_square(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void square_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, bool high_level) const;
+	void gbfv_square_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void squareNR(seal::Ciphertext& ciphertext, seal::Ciphertext& destination, bool high_level) const;
+	void gbfv_squareNR(seal::Ciphertext& ciphertext, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void squareNR_inplace(seal::Ciphertext& ciphertext, bool high_level) const;
+	void gbfv_squareNR_inplace(seal::Ciphertext& ciphertext, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void negate_inplace(seal::Ciphertext& ciphertext, bool high_level) const;
 
@@ -132,10 +146,10 @@ public:
 	Bootstrapper(Bootstrapper&&) = default;
 	~Bootstrapper() = default;
 
-	void create_bootstrapping_key(const seal::SecretKey& sk, BootstrappingKey& bk) const;
+	void create_bootstrapping_key(const seal::SecretKey& sk, BootstrappingKey& bk, uint64_t hamming_weight = 0) const;
 };
 
-inline const seal::Evaluator& Bootstrapper::bootstrapping_evaluator() const
+inline const ExtendedEvaluator& Bootstrapper::bootstrapping_evaluator() const
 {
 	return context_chain.target_evaluator();
 }

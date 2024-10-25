@@ -24,13 +24,13 @@ ContextChain::ContextChain(const SEALContext& base_context, size_t e, MemoryPool
 
 	uint64_t p = parms.plain_modulus().value();
 	contexts.push_back(base_context);
-	evaluators.emplace_back(std::make_unique<Evaluator, const SEALContext&>(contexts.back()));
+	evaluators.emplace_back(std::make_unique<ExtendedEvaluator, const SEALContext&>(contexts.back()));
 
 	for (size_t i = 1; i < e; ++i) {
 		EncryptionParameters new_parms = parms;
 		new_parms.set_plain_modulus(exponentiate_uint(p, i + 1));
 		contexts.emplace_back(new_parms, false, seal::sec_level_type::none);
-		evaluators.emplace_back(std::make_unique<Evaluator, const SEALContext&>(contexts.back()));
+		evaluators.emplace_back(std::make_unique<ExtendedEvaluator, const SEALContext&>(contexts.back()));
 	}
 	assert(evaluators.size() == contexts.size());
 
@@ -54,13 +54,13 @@ const SEALContext& ContextChain::get_context(size_t i) const
 	return contexts[i];
 }
 
-const Evaluator& ContextChain::get_evaluator(parms_id_type parm_id) const
+const ExtendedEvaluator& ContextChain::get_evaluator(parms_id_type parm_id) const
 {
 	size_t index = get_context_index(parm_id);
 	return get_evaluator(index);
 }
 
-const Evaluator& ContextChain::get_evaluator(size_t i) const
+const ExtendedEvaluator& ContextChain::get_evaluator(size_t i) const
 {
 	return *evaluators[i];
 }
@@ -90,7 +90,7 @@ const SEALContext& ContextChain::target_context() const
 	return contexts.back();
 }
 
-const Evaluator& ContextChain::target_evaluator() const
+const ExtendedEvaluator& ContextChain::target_evaluator() const
 {
 	return get_evaluator(size() - 1);
 }

@@ -44,8 +44,8 @@ function GBFVRecrypt(c, recrypt_variables)
     // Implementation is restricted to full splitting case
     assert (GetLTVersion() eq 3) and (p mod m eq 1);
 
-    mod_copy := c[2];   // Copy original value of plaintext modulus
-    c := ScaleAndRoundCiphertext(c, mod_copy, p);
+    mod_copy := x ^ gbfvExponent - gbfvCoefficient;   // Copy original value of plaintext modulus
+    //c := ScaleAndRoundCiphertext(c, mod_copy, p);   // Not necessary anymore
 
     /*** Evaluate partial thin bootstrapping ***/
 
@@ -54,6 +54,9 @@ function GBFVRecrypt(c, recrypt_variables)
     adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD,
     additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
     lowestDigitRemovalPolynomialOverRange := DecodeGBFVRecryptVariables(recrypt_variables);
+
+    PrintNoiseBudget(c: message := "initial");
+    timer_first_lt := StartTiming();
 
     // First stage
     dimensions := [GetNbDimensions(), 1];
@@ -70,8 +73,16 @@ function GBFVRecrypt(c, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(c: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_inner_product := StartTiming();
+
     // Homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_second_lt := StartTiming();
 
     // Other stages
     dim := GetNbDimensions() - 1;
@@ -89,12 +100,20 @@ function GBFVRecrypt(c, recrypt_variables)
     u := MatMul2DBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], dimensions,
                                        rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
 
+    PrintNoiseBudget(u: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    timer_digit_extract := StartTiming();
+
     // Convert back to GBFV
     u := SetPlaintextModulus(u, mod_copy ^ 2);
 
     // Digit extraction
-    return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>, func<x | ExactDivisionBy(x, mod_copy)>,
+    res := BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>, func<x | ExactDivisionBy(x, mod_copy)>,
                                        lowestDigitRemovalPolynomialOverRange);
+    res := SetPlaintextModulus(res, p);     // Won't print noise budget otherwise
+    PrintNoiseBudget(res: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    return res;
 end function;
 
 // Generate all variables necessary for the GBFV batch recryption procedure
@@ -136,9 +155,12 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     lowestDigitRetainPolynomials, lowestDigitRemovalPolynomialOverRange, pack_keys,
     unpack_keys := DecodeGBFVBatchRecryptVariables(recrypt_variables);
 
+    PrintNoiseBudget(c_list[1]: message := "batch initial");
+    timer_pack := StartTiming();
+
     // Convert to BFV
-    mod_copy := c_list[1][2];   // Copy original value of plaintext modulus
-    c_converted := [SetPlaintextModulus(c, p) : c in c_list];
+    //mod_copy := c_list[1][2]; // Copy original value of plaintext modulus     // Not necessary anymore
+    c_converted := c_list;      //[SetPlaintextModulus(c, p) : c in c_list];    // Not necessary anymore
 
     // Pack ciphertexts
     c := c_converted[1];
@@ -146,6 +168,10 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
         c := Add(c, ApplyAutomorphismCiphertext(c_converted[index + 1], ((-1) ^ (index mod 2) * 5 ^ (index div 2)) mod m,
                                                 pack_keys[index]));
     end for;
+
+    PrintNoiseBudget(c: message := "after batch packing");
+    StopTiming(timer_pack: message := "batch packing");
+    timer_first_lt := StartTiming();
 
     /*** Evaluate partial thin bootstrapping ***/
 
@@ -164,8 +190,16 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
         end if;
     end for;
 
+    PrintNoiseBudget(c: message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_inner_product := StartTiming();
+
     // Homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, additionConstant);
+
+    PrintNoiseBudget(u: message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_second_lt := StartTiming();
 
     // Other stages
     dim := GetNbDimensions() - 1;
@@ -183,14 +217,30 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     u := MatMul2DBadDimensionBabyGiant(u, adapted_evalInvConstantsAhead[1], adapted_evalInvConstantsBack[1], dimensions,
                                        rotationSwitchKeysAhead[1], switchKeysMinusD[1]);
 
+    PrintNoiseBudget(u: message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    timer_unpack := StartTiming();
+
     // Unpack ciphertexts
-    u_list := [ScaleAndRoundCiphertext(u, p ^ 2, mod_copy ^ 2)];
+    mod_copy := x ^ gbfvExponent - gbfvCoefficient; beta := ScaleAndRound(1, p, mod_copy);
+    u_list := [SetPlaintextModulus(MulConstant(u, beta ^ 2), mod_copy ^ 2)];
     for index := 1 to #c_list - 1 do
-        Append(~u_list, ScaleAndRoundCiphertext(ApplyAutomorphismCiphertext(u, Modinv((-1) ^ (index mod 2) * 5 ^ (index div 2), m),
-                                                                            unpack_keys[index]), p ^ 2, mod_copy ^ 2));
+        Append(~u_list, SetPlaintextModulus(MulConstant(ApplyAutomorphismCiphertext(u,
+                                                        Modinv((-1) ^ (index mod 2) * 5 ^ (index div 2), m),
+                                                        unpack_keys[index]), beta ^ 2), mod_copy ^ 2));
     end for;
 
+    // Won't print noise budget otherwise
+    PrintNoiseBudget(SetPlaintextModulus(u_list[1], p ^ 2): message := "after batch unpacking");
+    StopTiming(timer_unpack: message := "batch unpacking");
+    timer_digit_extract := StartTiming();
+
     // Digit extraction
-    return [BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>, func<x | ExactDivisionBy(x, mod_copy)>,
-                                        lowestDigitRemovalPolynomialOverRange) : u in u_list];
+    // Won't print noise budget otherwise
+    res := [SetPlaintextModulus(BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>,
+                                                            func<x | ExactDivisionBy(x, mod_copy)>,
+                                                            lowestDigitRemovalPolynomialOverRange), p) : u in u_list];
+    PrintNoiseBudget(res[1]: message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+    return res;
 end function;

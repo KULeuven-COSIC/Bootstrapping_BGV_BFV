@@ -12,10 +12,27 @@ void Bootstrapper::homomorphic_noisy_decrypt(const Ciphertext& ciphertext, const
 	if (!bk.is_valid_for(context_chain.target_context())) {
 		throw std::invalid_argument("Invalid bootstrapping key");
 	}
+	Ciphertext ctxt_copy = ciphertext;
+	if (bk.hamming_weight)	// switch to sparse key
+		get_evaluator(0).switch_sparse_key_inplace(ctxt_copy, bk.ek1, pool);
 	seal::Plaintext ciphertext_as_plaintext[2];
-	context_chain.convert_ciphertext_plain(ciphertext, ciphertext_as_plaintext, pool);
-	bootstrapping_evaluator().multiply_plain(bk.encrypted_sk, ciphertext_as_plaintext[1], destination, pool);
-	bootstrapping_evaluator().add_plain_inplace(destination, ciphertext_as_plaintext[0]);
+	context_chain.convert_ciphertext_plain(ctxt_copy, ciphertext_as_plaintext, pool);
+
+	// CKKS-like version of inner product where two switch keys are required for sparse secret encapsulation
+	if (bk.hamming_weight) {
+		// used in sparse secret encapsulation trick (paper on GBFV bootstrapping)
+		destination = bk.encrypted_sk;
+		multiply_plain_inplace(destination, Plaintext{ "0" }, 1);		// cheat zero encryption first
+		add_plain_inplace(destination, ciphertext_as_plaintext[0], 1);
+		bootstrapping_evaluator().add_plain_to_second_poly_inplace(destination, ciphertext_as_plaintext[1], pool);
+		
+		bootstrapping_evaluator().switch_sparse_key_inplace(destination, bk.ek2, pool);
+	}
+	else {
+		// used in other cases (paper on slot-to-coefficient transformation)
+		bootstrapping_evaluator().multiply_plain(bk.encrypted_sk, ciphertext_as_plaintext[1], destination, pool);
+		bootstrapping_evaluator().add_plain_inplace(destination, ciphertext_as_plaintext[0]);
+	}
 }
 
 Bootstrapper::Bootstrapper(const seal::SEALContext& bootstrapped_context, size_t exponent, MemoryPoolHandle pool)
@@ -23,21 +40,30 @@ Bootstrapper::Bootstrapper(const seal::SEALContext& bootstrapped_context, size_t
 {
 }
 
-void Bootstrapper::create_bootstrapping_key(const seal::SecretKey& sk, BootstrappingKey& bk) const
+void Bootstrapper::create_bootstrapping_key(const seal::SecretKey& sk, BootstrappingKey& bk, uint64_t hamming_weight) const
 {
+	// convert (sparse) secret key to plaintext
 	Plaintext sk_plain(MemoryManager::GetPool(mm_prof_opt::mm_force_new, true));
-	context_chain.convert_sk_plain(sk, sk_plain);
+	SparseKeyGenerator keygen_base(context_chain.base_context(), sk, hamming_weight);
+	if (hamming_weight)
+		context_chain.convert_sk_plain(keygen_base.sparse_key(), sk_plain);
+	else
+		context_chain.convert_sk_plain(sk, sk_plain);
 
+	// convert secret key to target context
 	SecretKey bootstrapping_sk;
 	context_chain.convert_sk(sk, bootstrapping_sk);
-
 	KeyGenerator keygen(context_chain.target_context(), bootstrapping_sk);
-	PublicKey pk;
-	keygen.create_public_key(pk);
 
-	Encryptor enc(context_chain.target_context(), pk);
+	// create encryption of plaintext secret under target secret key
+	Encryptor enc(context_chain.target_context(), bootstrapping_sk);
 	seal::Ciphertext enc_sk;
-	enc.encrypt(sk_plain, enc_sk, pool);
+	enc.encrypt_symmetric(sk_plain, enc_sk, pool);
+
+	// create sparse key generator for second encapsulation key
+	SecretKey sparse_key_boot;
+	context_chain.convert_sk(keygen_base.sparse_key(), sparse_key_boot);
+	SparseKeyGenerator keygen_boot(context_chain.target_context(), sparse_key_boot, sk);
 
 	std::cout << "creating " << global_galois_elements.size() << " galois keys" << std::endl;
 
@@ -47,10 +73,18 @@ void Bootstrapper::create_bootstrapping_key(const seal::SecretKey& sk, Bootstrap
 	RelinKeys rk;
 	keygen.create_relin_keys(rk);
 
+	KSwitchKeys ek1, ek2;
+	keygen_base.create_encapsulation_keys(ek1);
+	keygen_boot.create_encapsulation_keys(ek2);
+
 	bk.encrypted_sk = std::move(enc_sk);
 	bk.gk = std::move(gk);
 	bk.rk = std::move(rk);
+	bk.ek1 = std::move(ek1);
+	bk.ek2 = std::move(ek2);
 
+	bk.hamming_weight = hamming_weight;
+	
 	context_chain.convert_kswitchkey(bk.gk, bk.base_gk, 0);
 	context_chain.convert_kswitchkey(bk.rk, bk.base_rk, 0);
 }
@@ -60,7 +94,7 @@ bool BootstrappingKey::is_valid_for(const seal::SEALContext& context) const
 	return is_metadata_valid_for(gk, context) && is_metadata_valid_for(rk, context) && is_metadata_valid_for(encrypted_sk, context) && is_buffer_valid(gk) && is_buffer_valid(rk) && is_buffer_valid(encrypted_sk);
 }
 
-const seal::Evaluator& Bootstrapper::get_evaluator(bool high_level) const
+const ExtendedEvaluator& Bootstrapper::get_evaluator(bool high_level) const
 {
 	if (high_level)
 		return bootstrapping_evaluator();
@@ -236,6 +270,28 @@ void Bootstrapper::multiply(seal::Ciphertext& ciphertext1, seal::Ciphertext& cip
 	}
 }
 
+void Bootstrapper::gbfv_multiply(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext1, high_level);
+		transform_from_ntt_inplace(ciphertext2, high_level);
+		get_evaluator(high_level).gbfv_multiply(ciphertext1, ciphertext2, exponent, coefficient, high_level, destination);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+	try
+	{
+		get_evaluator(high_level).relinearize_inplace(destination, get_relin_keys(bk, high_level));
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
 void Bootstrapper::multiply_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, bool high_level) const
 {
 	try
@@ -243,6 +299,28 @@ void Bootstrapper::multiply_inplace(seal::Ciphertext& ciphertext1, seal::Ciphert
 		transform_from_ntt_inplace(ciphertext1, high_level);
 		transform_from_ntt_inplace(ciphertext2, high_level);
 		get_evaluator(high_level).multiply_inplace(ciphertext1, ciphertext2);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+	try
+	{
+		get_evaluator(high_level).relinearize_inplace(ciphertext1, get_relin_keys(bk, high_level));
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_multiply_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext1, high_level);
+		transform_from_ntt_inplace(ciphertext2, high_level);
+		get_evaluator(high_level).gbfv_multiply_inplace(ciphertext1, ciphertext2, exponent, coefficient, high_level);
 	}
 	catch (std::logic_error excp)
 	{
@@ -272,6 +350,20 @@ void Bootstrapper::multiplyNR(seal::Ciphertext& ciphertext1, seal::Ciphertext& c
 	}
 }
 
+void Bootstrapper::gbfv_multiplyNR(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext1, high_level);
+		transform_from_ntt_inplace(ciphertext2, high_level);
+		get_evaluator(high_level).gbfv_multiply(ciphertext1, ciphertext2, exponent, coefficient, high_level, destination);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
 void Bootstrapper::multiplyNR_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, bool high_level) const
 {
 	try
@@ -279,6 +371,20 @@ void Bootstrapper::multiplyNR_inplace(seal::Ciphertext& ciphertext1, seal::Ciphe
 		transform_from_ntt_inplace(ciphertext1, high_level);
 		transform_from_ntt_inplace(ciphertext2, high_level);
 		get_evaluator(high_level).multiply_inplace(ciphertext1, ciphertext2);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_multiplyNR_inplace(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext1, high_level);
+		transform_from_ntt_inplace(ciphertext2, high_level);
+		get_evaluator(high_level).gbfv_multiply_inplace(ciphertext1, ciphertext2, exponent, coefficient, high_level);
 	}
 	catch (std::logic_error excp)
 	{
@@ -365,12 +471,54 @@ void Bootstrapper::square(seal::Ciphertext& ciphertext, const BootstrappingKey& 
 	}
 }
 
+void Bootstrapper::gbfv_square(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext, high_level);
+		get_evaluator(high_level).gbfv_square(ciphertext, exponent, coefficient, high_level, destination);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+	try
+	{
+		get_evaluator(high_level).relinearize_inplace(destination, get_relin_keys(bk, high_level));
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
 void Bootstrapper::square_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, bool high_level) const
 {
 	try
 	{
 		transform_from_ntt_inplace(ciphertext, high_level);
 		get_evaluator(high_level).square_inplace(ciphertext);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+	try
+	{
+		get_evaluator(high_level).relinearize_inplace(ciphertext, get_relin_keys(bk, high_level));
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_square_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext, high_level);
+		get_evaluator(high_level).gbfv_square_inplace(ciphertext, exponent, coefficient, high_level);
 	}
 	catch (std::logic_error excp)
 	{
@@ -399,12 +547,38 @@ void Bootstrapper::squareNR(seal::Ciphertext& ciphertext, seal::Ciphertext& dest
 	}
 }
 
+void Bootstrapper::gbfv_squareNR(seal::Ciphertext& ciphertext, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext, high_level);
+		get_evaluator(high_level).gbfv_square(ciphertext, exponent, coefficient, high_level, destination);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
 void Bootstrapper::squareNR_inplace(seal::Ciphertext& ciphertext, bool high_level) const
 {
 	try
 	{
 		transform_from_ntt_inplace(ciphertext, high_level);
 		get_evaluator(high_level).square_inplace(ciphertext);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_squareNR_inplace(seal::Ciphertext& ciphertext, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	try
+	{
+		transform_from_ntt_inplace(ciphertext, high_level);
+		get_evaluator(high_level).gbfv_square_inplace(ciphertext, exponent, coefficient, high_level);
 	}
 	catch (std::logic_error excp)
 	{

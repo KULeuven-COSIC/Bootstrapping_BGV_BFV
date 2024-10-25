@@ -6,15 +6,15 @@ int main()
 	EncryptionParameters parms(scheme_type::bfv);
 	size_t ring_dimension = (size_t)1 << (global_log2N - 1);
 	parms.set_poly_modulus_degree(ring_dimension);
-	parms.set_coeff_modulus(CoeffModulus::Create(ring_dimension, { 60, 60, 60, 60, 60, 60, 60, 60, 60,
-														           60, 60, 60, 60, 60, 60, 60, 60, 60 }));
+	parms.set_coeff_modulus(CoeffModulus::Create(ring_dimension, { 60, 60, 60, 60, 60, 60, 60 }));
 	parms.set_plain_modulus(global_prime_plaintext_modulus);
 	SEALContext context(parms, false, seal::sec_level_type::none);
 	std::cout << "Q bit count is " << context.key_context_data()->total_coeff_modulus_bit_count() << std::endl;
 
 	// set up keys
-	KeyGenerator keygen(context);
-	SecretKey sk = keygen.secret_key();
+	SparseKeyGenerator keygen_sparse(context, 256);			// Hamming weight zero means ternary uniform distribution
+	SecretKey sk = keygen_sparse.sparse_key();
+	KeyGenerator keygen(context, sk);
 	PublicKey pk;
 	keygen.create_public_key(pk);
 
@@ -39,7 +39,7 @@ int main()
 	std::cout << "initialized bootstrapper" << std::endl;
 
 	BootstrappingKey bk;
-	bootstrapper.create_bootstrapping_key(sk, bk);
+	bootstrapper.create_bootstrapping_key(sk, bk, 32);		// Hamming weight zero means no sparse secret encapsulation
 
 	std::cout << "created bootstrapping key" << std::endl << std::endl;
 

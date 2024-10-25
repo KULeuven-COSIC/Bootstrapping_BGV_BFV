@@ -40,8 +40,19 @@ end function;
 function Encrypt(m, ti, pk: print_result := true)
     q := GetDefaultModulus();
     u := TernaryPol(h);
-    return <[ ((u*pk[1] + ErrorPol() + ScaleAndRound(m, q, ti)) mod f) mod q, ((u*pk[2] + ErrorPol()) mod f) mod q ],
-              (Category(ti) eq RngIntElt) select ti else ti mod f, q, R!(errorB * n / 2) * (1 + h + can_max)>;
+    if Category(ti) eq RngIntElt then
+        res := <[ ((u*pk[1] + ErrorPol() + (q div ti)*m) mod f) mod q, ((u*pk[2] + ErrorPol()) mod f) mod q ], ti, q,
+                  R!(errorB * n / 2) * (1 + h + can_max)>;
+        if print_result then
+            hash1 := RandomHash(); hash2 := MyHash(res);
+            UsePlaintext(hash1, m mod ti);
+            EncryptPlaintextToCiphertext(hash1, hash2, ti eq p ^ e);
+        end if;
+        return res;
+    else
+        return <[ ((u*pk[1] + ErrorPol() + ScaleAndRound(m, q, ti)) mod f) mod q, ((u*pk[2] + ErrorPol()) mod f) mod q ],
+                  (Category(ti) eq RngIntElt) select ti else ti mod f, q, R!(errorB * n / 2) * (1 + h + can_max)>;
+    end if;
 end function;
 
 // Generate encryption of the given key
@@ -59,9 +70,43 @@ function GenEncryptedKey(sk, key)
 end function;
 
 // Decryption, can do general ciphertexts, not only linear ones
-function Decrypt(c, sk)
-    res := ScaleAndRound(EvalC(c, sk), c[2], c[3]);
-    return Category(c[2]) eq RngIntElt select res mod c[2] else Flatten(res, c[2]);
+function Decrypt(c, sk: print_result := true, print_plaintext := true, print_noise := true, message := "",
+                        check_correctness := false, expected_result := 0)
+    if Category(c[2]) eq RngIntElt then
+        res := ScaleAndRound(EvalC(c, sk), c[2], c[3]) mod c[2];
+        if print_result or check_correctness then
+            hash1 := MyHash(c); hash2 := RandomHash();
+            message := (message eq "") select hash1 else message;
+            UseCiphertext(hash1: terminate := true);
+            PrintFile(TERMINATE, "bootstrapper.transform_from_ntt_inplace(*" cat hash1 cat ", " cat GetHighLevelBit(c) cat ");");
+            PrintFile(TERMINATE, "Plaintext " cat hash2 cat ";");
+            decryptor := IsHighLevel(c) select "target_decryptor" else "decryptor";
+            PrintFile(TERMINATE, "try { " cat decryptor cat ".decrypt(*" cat hash1 cat ", " cat hash2 cat "); } catch (...) {}");
+            if print_result then
+                if print_plaintext then
+                    PrintFile(TERMINATE, "std::cout << \"output " cat message cat ": \" << " cat hash2 cat
+                                         ".to_string() << std::endl;");
+                end if;
+                if print_noise then
+                    random_noise_budget := RandomHash();
+                    PrintFile(TERMINATE, "try { auto " cat random_noise_budget cat " = " cat decryptor cat
+                                         ".invariant_noise_budget(*" cat hash1 cat "); std::cout << \"noise budget " cat message
+                                         cat ": \" << " cat random_noise_budget cat (IsHighLevel(c) select (" + " cat
+                                         IntegerToString(Round(Log(2, p)))) else "") cat " << std::endl; } catch (...) {}");
+                end if;
+            end if;
+        end if;
+        if check_correctness then
+            hash3 := RandomHash();
+            UsePlaintext(hash3, expected_result mod c[2]);
+            PrintFile(TERMINATE, "std::cout << \"correctness " cat message cat ": \" << (" cat hash2 cat
+                                 " == " cat hash3 cat ") << std::endl;");
+        end if;
+        return res;
+    else
+        res := ScaleAndRound(EvalC(c, sk), c[2], c[3]);
+        return Category(c[2]) eq RngIntElt select res mod c[2] else Flatten(res, c[2]);
+    end if;
 end function;
 
 // Print the remaining noise budget of the given ciphertext
@@ -131,17 +176,42 @@ procedure AutomaticModSwitchRelin(~cp)
 end procedure;
 
 // Addition with constant
-function AddConstant(c, constant)
-    return Add(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+function AddConstant(c, constant: print_result := true)
+    constant := Flatten(constant, GetPlaintextModulus(c));
+    if IsZero(constant) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
+    res := Add(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
+    if print_result then
+        hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.add_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        UseCiphertext(hash1); UsePlaintext(hash2, constant mod (IsHighLevel(c) select p ^ 2 else p));
+    end if;
+    return res;
 end function;
 
 // Compute ciphertext minus constant
 function SubCiphertextConstant(c, constant)
-    return Sub(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+    constant := Flatten(constant, GetPlaintextModulus(c));
+    if IsZero(constant) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
+    res := Sub(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
+    hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
+    PrintFile(TRACE, "bootstrapper.sub_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
+                     hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+    UseCiphertext(hash1); UsePlaintext(hash2, constant mod (IsHighLevel(c) select p ^ 2 else p));
+    return res;
 end function;
 
 // Compute constant minus ciphertext
 function SubConstantCiphertext(c, constant)
+    error "Subtracting is not allowed.";
     return Sub(<[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
 end function;
 
@@ -189,11 +259,14 @@ function MulNR(c1, c2: print_result := true)
     if print_result then
         hash3 := MyHash(res); CreateCiphertext(hash3);
         if hash1 eq hash2 then
-            PrintFile(TRACE, "bootstrapper.squareNR(*" cat hash1 cat ", *" cat
-                             hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+            PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "squareNR(*" cat hash1 cat
+                             ", *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select (IntegerToString(gbfvExponent) cat ", " cat
+                             IntegerToString(gbfvCoefficient) cat ", ") else "") cat GetHighLevelBit(res) cat ");");
         else
-            PrintFile(TRACE, "bootstrapper.multiplyNR(*" cat hash1 cat ", *" cat hash2 cat ", *" cat
-                             hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+            PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "multiplyNR(*" cat hash1 cat
+                             ", *" cat hash2 cat ", *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select
+                             (IntegerToString(gbfvExponent) cat ", " cat IntegerToString(gbfvCoefficient) cat ", ") else "") cat
+                             GetHighLevelBit(res) cat ");");
         end if;
         UseCiphertext(hash1); UseCiphertext(hash2);
     end if;
@@ -244,12 +317,21 @@ end function;
 // Given an encryption of a plaintext that is divisible by number, divide
 // it by number and decrease the plaintext modulus with the same amount
 function ExactDivisionBy(c, number)
-    if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
-        c[2] div:= number;
-    else
-        c[2] := Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number));
+    if IsZero(c) then
+        return GetZeroCiphertext((Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) select
+                                 (c[2] div number) else (Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number))));
     end if;
-    return c;
+
+    res := CopyCiphertext(c);
+    hash := MyHash(res);
+    if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
+        res[2] div:= number;    // Important: this does not change the hash value!
+    else
+        res[2] := Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number));
+    end if;
+    PrintFile(TRACE, "bootstrapper.high_to_low_level_inplace(*" cat hash cat ");");
+    UseCiphertext(hash);        // Strictly speaking not necessary: already done in copy function
+    return res;
 end function;
 
 // Set the plaintext modulus to the given value

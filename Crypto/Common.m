@@ -127,11 +127,16 @@ function GetPlaintextModulus(ciphertext)
 end function;
 
 function IsHighLevel(ciphertext)
-    return GetPlaintextModulus(ciphertext) eq p ^ e;
+    return (GetPlaintextModulus(ciphertext) eq p ^ e) or
+           (ToCyclotomicField(GetPlaintextModulus(ciphertext)) eq common_moduli[e]);
 end function;
 
 function GetHighLevelBit(ciphertext)
     return IsHighLevel(ciphertext) select "1" else "0";
+end function;
+
+function IsGBFVCiphertext(ciphertext)
+    return Category(GetPlaintextModulus(ciphertext)) ne RngIntElt;
 end function;
 
 
@@ -217,20 +222,30 @@ function Mul(c1, c2, rk)
     res := CopyCiphertext(mul: print_result := false);
     hash3 := MyHash(res); CreateCiphertext(hash3);
     if hash1 eq hash2 then
-        PrintFile(TRACE, "bootstrapper.square(*" cat hash1 cat ", bk, *" cat
-                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "square(*" cat hash1 cat
+                         ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select (IntegerToString(gbfvExponent) cat ", " cat
+                         IntegerToString(gbfvCoefficient) cat ", ") else "") cat GetHighLevelBit(res) cat ");");
     else
-        PrintFile(TRACE, "bootstrapper.multiply(*" cat hash1 cat ", *" cat hash2 cat ", bk, *" cat
-                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "multiply(*" cat hash1 cat
+                         ", *" cat hash2 cat ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select
+                         (IntegerToString(gbfvExponent) cat ", " cat IntegerToString(gbfvCoefficient) cat ", ") else "") cat
+                         GetHighLevelBit(res) cat ");");
     end if;
     UseCiphertext(hash1); UseCiphertext(hash2);
     return res;
 end function;
 
 // Multiplication with constant
-function MulConstant(c, constant)
-    constant := Flatten(constant, c[2]);
-    res := <[((constant * cPart) mod f) mod c[3] : cPart in c[1]], c[2], c[3], SquareSum(constant) * c[4]>;
+function MulConstant(c, constant: print_result := true)
+    constant := Flatten(constant, GetPlaintextModulus(c));
+    if IsZero(c) or IsZero(constant) then
+        return GetZeroCiphertext(c);
+    elif IsOne(constant) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
+    mul := <[((constant * cPart) mod f) mod c[3] : cPart in c[1]], c[2], c[3], SquareSum(constant) * c[4]>;
 
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~mul);
@@ -239,12 +254,12 @@ function MulConstant(c, constant)
         hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
         PrintFile(TRACE, "bootstrapper.multiply_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
                          hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-        seq := Eltseq(constant mod GetPlaintextModulus(c));
-        if ((&+[el eq 0 select 0 else 1 : el in seq]) eq 1) and ((&+seq) gt (GetPlaintextModulus(c) div 2)) then
+        SEAL_modulus := IsHighLevel(res) select p ^ 2 else p; seq := Eltseq(constant mod SEAL_modulus);
+        if ((&+[el eq 0 select 0 else 1 : el in seq]) eq 1) and ((&+seq) gt (SEAL_modulus div 2)) then
             PrintFile(TRACE, "bootstrapper.negate_inplace(*" cat hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-            UsePlaintextOptimalDomain(hash2, (-constant) mod GetPlaintextModulus(c), IsHighLevel(res));
+            UsePlaintextOptimalDomain(hash2, (-constant) mod SEAL_modulus, IsHighLevel(res));
         else
-            UsePlaintextOptimalDomain(hash2, constant mod GetPlaintextModulus(c), IsHighLevel(res));
+            UsePlaintextOptimalDomain(hash2, constant mod SEAL_modulus, IsHighLevel(res));
         end if;
         UseCiphertext(hash1);
     end if;

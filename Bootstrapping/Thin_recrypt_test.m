@@ -6,6 +6,7 @@ load "Crypto/BFV/BFV.m";
 load "Bootstrapping/Thin_recrypt.m";
 
 sk, pk := GenKeyPair();
+rk := GenRelinKey(sk);
 
 
 
@@ -20,6 +21,12 @@ if scheme eq "BFV" then
 else
     csq := ModSwitch(csq, baseModulus ^ Round(Log(baseModulus, 2 ^ 100)));  // BGV
 end if;
+
+
+
+// Compute square so that initial capacity drops a little bit
+msq := ((msq ^ 2) mod f) mod p;
+csq := Mul(csq, csq, rk);
 
 
 

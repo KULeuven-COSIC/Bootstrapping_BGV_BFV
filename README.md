@@ -23,6 +23,6 @@ The code is divided over the following folders:
 ## Exporting functionality to SEAL
 
 The code can be exported to SEAL, which is based on the implementation of this [paper](https://eprint.iacr.org/2023/1304):
-* Set the desired parameters in this [file](Crypto/Params.m).
+* Set the desired parameters in this [file](Crypto/Params.m) and this [file](Bootstrapping_SEAL/seal.cpp).
 * Run any of the test files in this [folder](Bootstrapping).
 * Now it is possible to compile and run the SEAL code in this [folder](Bootstrapping_SEAL).
