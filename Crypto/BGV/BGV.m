@@ -19,6 +19,7 @@ nbModuli := Floor(Log(baseModulus, q / t / modPrecision));
 q_prime := baseModulus ^ nbModuli;
 q_double_prime := Floor((q / q_prime - 1) / t) * t + 1;
 defaultModulus := q_prime * q_double_prime;
+assert nbModuli ge 0;
 
 // Return the default ciphertext modulus of a freshly encrypted plaintext
 function GetDefaultModulus()
@@ -111,7 +112,7 @@ end procedure;
 procedure AutomaticModSwitchMul(~cp)
     assert IsDivisibleBy(t, cp[2]);     // Check that r in 'Crypto/Params.m' is high enough
 
-    if Sqrt(cp[4]) gt 0 then
+    if (Sqrt(cp[4]) gt 0) and (1 / Sqrt(cp[4]) ne 0) then
         // Estimate roughly the size of the new modulus
         mod_size := cp[3] * noiseLevelMul / Sqrt(cp[4]);
         fact1 := baseModulus ^ Maximum(Floor(Log(baseModulus, mod_size / cp[2] / modPrecision)), 0);
@@ -129,7 +130,7 @@ end procedure;
 procedure AutomaticModSwitchRelin(~cp)
     assert IsDivisibleBy(t, cp[2]);     // Check that r in 'Crypto/Params.m' is high enough
 
-    if Sqrt(cp[4]) gt 0 then
+    if (Sqrt(cp[4]) gt 0) and (1 / Sqrt(cp[4]) ne 0) then
         // Estimate roughly the size of the new modulus
         mod_size := cp[3] * (t / cp[2]) * noiseLevelRelin / Sqrt(cp[4]);
         newMod := baseModulus ^ Maximum(Ceiling(Log(baseModulus, mod_size / q_double_prime)), 0) * q_double_prime;

@@ -38,7 +38,7 @@ end function;
 // Return a new ciphertext that encrypts the constant 0
 function GetZeroCiphertext(c)
     q := GetDefaultModulus();
-    if Category(c) eq RngIntElt then
+    if (Category(c) eq RngIntElt) or (Category(c) eq RngUPolElt) then
         return <[Zx | 0], c, q, R!0>;
     else
         return <[Zx | 0], c[2], q, R!0>;
@@ -47,6 +47,9 @@ end function;
 
 // Return the plaintext Hensel exponent of the given ciphertext
 function GetHenselExponent(c)
+    if Category(c[2]) ne RngIntElt then
+        error "This function does not accept GBFV ciphertexts.";
+    end if;
     return Round(Log(p, c[2]));
 end function;
 
@@ -158,7 +161,7 @@ end function;
 
 // Multiplication with constant
 function MulConstant(c, constant)
-    constant := CenteredReduction(constant, c[2]);
+    constant := Flatten(constant, c[2]);
     res := <[((constant * cPart) mod f) mod c[3] : cPart in c[1]], c[2], c[3], SquareSum(constant) * c[4]>;
 
     // Decrease current modulus for efficiency reasons
@@ -174,13 +177,13 @@ end function;
 
 
 
-// Max norm of the error in coefficient embedding
+// Max norm of the error in the coefficient embedding
 // The error is normalized to the standard modulus q
 function ErrorC(c, sk)
     return R!(Log(2, (q / c[3]) * MaximumOrOne([Abs(coeff) : coeff in Eltseq(CiphertextErrorPol(c, sk))])));
 end function;
 
-// The maximum of the entries of the error polynomial in the canonical embedding
+// Max norm of the error in the canonical embedding
 // The error is normalized to the standard modulus q
 function ErrorCanC(c, sk)
     return R!(Log(2, (q / c[3]) * MaximumOrOne(GetMaxModulus(CiphertextErrorPol(c, sk)))));

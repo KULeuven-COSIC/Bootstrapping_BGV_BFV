@@ -26,3 +26,7 @@ can_max := 900;                   // To be determined experimentally from 'Scrip
 
 // Batch encoding in plaintext slots can be done with naive or FFT-based algorithm
 useFFTBatchEncoder := false;      // Use batch encoder based on FFT algorithm (only possible if m is a power of two)
+
+// GBFV parameters for binomial plaintext modulus
+gbfvExponent := 1;                // Degree of the GBFV plaintext modulus
+gbfvCoefficient := 2;             // Coefficient of the GBFV plaintext modulus

@@ -14,7 +14,7 @@ mm2 := Decrypt(c2, sk);
 "Test decrypt m2", mm2 eq m2;
 
 cs1 := Encrypt(m1, t, pk);
-cs1 := ModSwitch(cs1, defaultModulus div baseModulus);
+cs1 := ModSwitch(cs1, defaultModulus div (baseModulus ^ Minimum(nbModuli, 1)));
 ms1 := Decrypt(cs1, sk);
 "Test mod switch ms1", ms1 eq m1;
 
@@ -54,7 +54,7 @@ mmr := Decrypt(cmr, sk);
 
 csm1 := Encrypt(m1, t, pk);
 csm2 := Encrypt(m2, t, pk);
-csm2 := ModSwitch(csm2, defaultModulus div baseModulus);
+csm2 := ModSwitch(csm2, defaultModulus div (baseModulus ^ Minimum(nbModuli, 1)));
 csm := MulNR(csm1, csm2);
 msm := Decrypt(csm, sk);
 "Test hom mul no relin different mod", msm eq (((m1*m2) mod f) mod t);
