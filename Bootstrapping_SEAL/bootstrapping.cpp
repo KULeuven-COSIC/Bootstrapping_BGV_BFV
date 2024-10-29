@@ -22,8 +22,8 @@ void Bootstrapper::homomorphic_noisy_decrypt(const Ciphertext& ciphertext, const
 	if (bk.hamming_weight) {
 		// used in sparse secret encapsulation trick (paper on GBFV bootstrapping)
 		destination = bk.encrypted_sk;
-		multiply_plain_inplace(destination, Plaintext{ "0" }, 1);		// cheat zero encryption first
-		add_plain_inplace(destination, ciphertext_as_plaintext[0], 1);
+		multiply_plain_inplace(destination, Plaintext{ "0" }, 1, true);		// cheat zero encryption first
+		add_plain_inplace(destination, ciphertext_as_plaintext[0], 1, true);
 		bootstrapping_evaluator().add_plain_to_second_poly_inplace(destination, ciphertext_as_plaintext[1], pool);
 		
 		bootstrapping_evaluator().switch_sparse_key_inplace(destination, bk.ek2, pool);
@@ -183,7 +183,7 @@ void Bootstrapper::add_plain(seal::Ciphertext& ciphertext, const seal::Plaintext
 	}
 }
 
-void Bootstrapper::add_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const
+void Bootstrapper::add_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level, bool suppress_warning) const
 {
 	try
 	{
@@ -192,7 +192,8 @@ void Bootstrapper::add_plain_inplace(seal::Ciphertext& ciphertext, const seal::P
 	}
 	catch (std::logic_error excp)
 	{
-		std::cout << excp.what() << std::endl;
+		if (!suppress_warning)
+			std::cout << excp.what() << std::endl;
 	}
 }
 
@@ -434,7 +435,7 @@ void Bootstrapper::multiply_plain(seal::Ciphertext& ciphertext, const seal::Plai
 	}
 }
 
-void Bootstrapper::multiply_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const
+void Bootstrapper::multiply_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level, bool suppress_warning) const
 {
 	try
 	{
@@ -446,7 +447,8 @@ void Bootstrapper::multiply_plain_inplace(seal::Ciphertext& ciphertext, const se
 	}
 	catch (std::logic_error excp)
 	{
-		std::cout << excp.what() << std::endl;
+		if (!suppress_warning)
+			std::cout << excp.what() << std::endl;
 	}
 }
 
@@ -701,6 +703,38 @@ void Bootstrapper::high_to_low_level_inplace(seal::Ciphertext& ciphertext) const
 	{
 		transform_from_ntt_inplace(ciphertext, 1);
 		context_chain.divide_exact_switch_inplace(ciphertext);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_to_bfv(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	destination = ciphertext;
+	multiply_plain_inplace(destination, Plaintext{ "0" }, high_level, true);		// cheat zero encryption first
+	add_plain_inplace(destination, Plaintext{ "1" }, high_level, true);				// make encryption of one
+	try
+	{
+		// simply forget to scale up by beta
+		gbfv_multiply_inplace(destination, ciphertext, bk, exponent, coefficient, high_level);
+	}
+	catch (std::logic_error excp)
+	{
+		std::cout << excp.what() << std::endl;
+	}
+}
+
+void Bootstrapper::gbfv_to_bfv_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const
+{
+	Ciphertext one_encryption = ciphertext;
+	multiply_plain_inplace(one_encryption, Plaintext{ "0" }, high_level, true);		// cheat zero encryption first
+	add_plain_inplace(one_encryption, Plaintext{ "1" }, high_level, true);			// make encryption of one
+	try
+	{
+		// simply forget to scale up by beta
+		gbfv_multiply_inplace(ciphertext, one_encryption, bk, exponent, coefficient, high_level);
 	}
 	catch (std::logic_error excp)
 	{

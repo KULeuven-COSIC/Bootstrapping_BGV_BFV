@@ -188,7 +188,8 @@ function AddConstant(c, constant: print_result := true)
         hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
         PrintFile(TRACE, "bootstrapper.add_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
                          hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-        UseCiphertext(hash1); UsePlaintext(hash2, constant mod (IsHighLevel(c) select p ^ 2 else p));
+        multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
+        UseCiphertext(hash1); UsePlaintext(hash2, (constant * multiplier) mod (IsHighLevel(c) select p ^ 2 else p));
     end if;
     return res;
 end function;
@@ -205,7 +206,8 @@ function SubCiphertextConstant(c, constant)
     hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
     PrintFile(TRACE, "bootstrapper.sub_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
                      hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-    UseCiphertext(hash1); UsePlaintext(hash2, constant mod (IsHighLevel(c) select p ^ 2 else p));
+    multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
+    UseCiphertext(hash1); UsePlaintext(hash2, (constant * multiplier) mod (IsHighLevel(c) select p ^ 2 else p));
     return res;
 end function;
 
@@ -309,9 +311,19 @@ end function;
 // Scale and round the given ciphertext over qp/q and scale the plaintext
 // modulus over its inverse
 function ScaleAndRoundCiphertext(c, qp, q)
+    if IsZero(c) then
+        return GetZeroCiphertext(c);
+    end if;
+    hash1 := MyHash(c);
+
     ptxt_mod := ScaleAndRound(c[2], q, qp);
-    return <[ScaleAndRound(poly, qp, q) : poly in c[1]], Degree(ptxt_mod) eq 0 select Z!ptxt_mod else ptxt_mod, c[3],
+    res := <[ScaleAndRound(poly, qp, q) : poly in c[1]], Degree(ptxt_mod) eq 0 select Z!ptxt_mod else ptxt_mod, c[3],
             (SquareSum(qp) / SquareSum(q)) * c[4]>;
+    hash2 := MyHash(res); CreateCiphertext(hash2);
+    PrintFile(TRACE, "bootstrapper.gbfv_to_bfv(*" cat hash1 cat ", bk, *" cat hash2 cat ", " cat IntegerToString(gbfvExponent) cat
+                     ", " cat IntegerToString(gbfvCoefficient) cat ", " cat GetHighLevelBit(res) cat ");");
+    UseCiphertext(hash1);
+    return res;
 end function;
 
 // Given an encryption of a plaintext that is divisible by number, divide

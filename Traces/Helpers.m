@@ -107,7 +107,7 @@ PrintFile(TERMINATE, "std::cout << std::endl;");
 
 EncryptPlaintextToCiphertext("Plaintext{ \"0\" }", "ZERO_CIPHERTEXT_LOW", false);
 EncryptPlaintextToCiphertext("Plaintext{ \"0\" }", "ZERO_CIPHERTEXT_HIGH", true);
-PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_LOW, Plaintext{ \"0\" }, 0);");
-PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_HIGH, Plaintext{ \"0\" }, 1);");
+PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_LOW, Plaintext{ \"0\" }, 0, true);");
+PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_HIGH, Plaintext{ \"0\" }, 1, true);");
 
 DeleteCiphertext("ZERO_CIPHERTEXT_HIGH");

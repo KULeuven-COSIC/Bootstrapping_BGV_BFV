@@ -76,7 +76,7 @@ public:
 
 	void add_plain(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, seal::Ciphertext& destination, bool high_level) const;
 
-	void add_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const;
+	void add_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level, bool suppress_warning = false) const;
 
 	void sub(seal::Ciphertext& ciphertext1, seal::Ciphertext& ciphertext2, seal::Ciphertext& destination, bool high_level) const;
 
@@ -104,7 +104,7 @@ public:
 
 	void multiply_plain(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, seal::Ciphertext& destination, bool high_level) const;
 	
-	void multiply_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level) const;
+	void multiply_plain_inplace(seal::Ciphertext& ciphertext, const seal::Plaintext& plaintext, bool high_level, bool suppress_warning = false) const;
 
 	void square(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, bool high_level) const;
 	void gbfv_square(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
@@ -133,6 +133,10 @@ public:
 	void homomorphic_noisy_decrypt(Ciphertext& ciphertext, const BootstrappingKey& bk, Ciphertext& destination) const;
 
 	void high_to_low_level_inplace(seal::Ciphertext& ciphertext) const;
+
+	void gbfv_to_bfv(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, seal::Ciphertext& destination, size_t exponent, uint64_t coefficient, bool high_level) const;
+
+	void gbfv_to_bfv_inplace(seal::Ciphertext& ciphertext, const BootstrappingKey& bk, size_t exponent, uint64_t coefficient, bool high_level) const;
 
 	void set_optimal_coefficient_domain();
 	void set_optimal_ntt_domain();

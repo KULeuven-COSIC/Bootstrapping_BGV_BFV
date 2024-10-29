@@ -44,8 +44,11 @@ function GBFVRecrypt(c, recrypt_variables)
     // Implementation is restricted to full splitting case
     assert (GetLTVersion() eq 3) and (p mod m eq 1);
 
-    mod_copy := x ^ gbfvExponent - gbfvCoefficient;   // Copy original value of plaintext modulus
-    //c := ScaleAndRoundCiphertext(c, mod_copy, p);   // Not necessary anymore
+    PrintNoiseBudget(SetPlaintextModulus(c, p): message := "initial");
+    timer_first_lt := StartTiming();
+
+    mod_copy := x ^ gbfvExponent - gbfvCoefficient;                         // Copy original value of plaintext modulus
+    c := SetPlaintextModulus(ScaleAndRoundCiphertext(c, mod_copy, p), p);   // Won't print noise budget otherwise
 
     /*** Evaluate partial thin bootstrapping ***/
 
@@ -54,9 +57,6 @@ function GBFVRecrypt(c, recrypt_variables)
     adapted_evalInvConstantsBack, rotationSwitchKeysAhead, switchKeysMinusD,
     additionConstant, liftingPolynomial, lowestDigitRetainPolynomials,
     lowestDigitRemovalPolynomialOverRange := DecodeGBFVRecryptVariables(recrypt_variables);
-
-    PrintNoiseBudget(c: message := "initial");
-    timer_first_lt := StartTiming();
 
     // First stage
     dimensions := [GetNbDimensions(), 1];
