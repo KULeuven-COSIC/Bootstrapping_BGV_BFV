@@ -2,6 +2,6 @@
 #include <vector>
 #include <stdint.h>
 
-extern uint64_t global_log2N;
-extern uint64_t global_prime_plaintext_modulus;
-extern std::vector<uint32_t> global_galois_elements;
+extern const uint64_t global_log2N;
+extern const uint64_t global_prime_plaintext_modulus;
+extern const std::vector<uint32_t> global_galois_elements;

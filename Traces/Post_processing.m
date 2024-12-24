@@ -3,10 +3,10 @@ galois_elts := Sort([el2 : el2 in {StringToInteger(el1) : el1 in Split(Read(CONS
 
 PrintFile(CONSTANTS, "#include \"constants.h\"": Overwrite := true);
 PrintFile(CONSTANTS, "");
-PrintFile(CONSTANTS, "uint64_t global_log2N = " cat IntegerToString(Round(Log(2, m))) cat ";");
-PrintFile(CONSTANTS, "uint64_t global_prime_plaintext_modulus = " cat IntegerToString(p) cat ";");
-PrintFile(CONSTANTS, "std::vector<uint32_t> global_galois_elements{ " cat &cat[Strings() | IntegerToString(galois_elts[index]) cat
-                     (index eq #galois_elts select "" else ", ") : index in [1..#galois_elts]] cat " };");
+PrintFile(CONSTANTS, "const uint64_t global_log2N = " cat IntegerToString(Round(Log(2, m))) cat ";");
+PrintFile(CONSTANTS, "const uint64_t global_prime_plaintext_modulus = " cat IntegerToString(p) cat ";");
+PrintFile(CONSTANTS, "const std::vector<uint32_t> global_galois_elements{ " cat &cat[Strings() | IntegerToString(galois_elts[index])
+                     cat (index eq #galois_elts select "" else ", ") : index in [1..#galois_elts]] cat " };");
 
 // Write deletes to trace file
 nb_ops := StringToInteger(Read(output_folder cat "ops")); trace := Split(Read(TRACE), "\t");
