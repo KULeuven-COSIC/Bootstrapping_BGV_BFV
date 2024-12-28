@@ -123,7 +123,7 @@ const SecretKey& SparseKeyGenerator::sparse_key() const
 }
 
 // Note: insecure implementation but suffices for simulation purposes
-// Secure implementation should either increase the noise or decrease the modulus to decompensate for lower Hamming weight
+// Secure implementation should either increase the noise or decrease the modulus to compensate for lower Hamming weight
 void SparseKeyGenerator::generate_one_kswitch_key(ConstRNSIter new_key, vector<PublicKey>& destination, bool save_seed)
 {
     if (!context_.using_keyswitching())
