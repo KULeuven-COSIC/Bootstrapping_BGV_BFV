@@ -50,7 +50,7 @@ function GBFVRecrypt(c, recrypt_variables)
     mod_copy := x ^ gbfvExponent - gbfvCoefficient;                         // Copy original value of plaintext modulus
     c := SetPlaintextModulus(ScaleAndRoundCiphertext(c, mod_copy, p), p);   // Won't print noise budget otherwise
 
-    /*** Evaluate partial thin bootstrapping ***/
+    /*** Evaluate slot-wise noisy expansion ***/
 
     // Decode recryption variables
     rk, bootKey, adapted_evalConstantsAhead, adapted_evalConstantsBack, adapted_evalInvConstantsAhead,
@@ -120,7 +120,7 @@ end function;
 function GenerateGBFVBatchRecryptVariables(sk, pk, B)
     variables := GenerateThinRecryptVariables(sk, pk, 1, 2, B);
 
-    // Multiply lowest digit removal polynomial by inverse of beta
+    // Multiply lowest digit removal polynomial by square of inverse of beta
     base_modulus := x ^ gbfvExponent - gbfvCoefficient;
     beta := Zx!Eltseq(ToCyclotomicField(p) * common_inverses[Index(common_moduli, ToCyclotomicField(base_modulus))]);
     beta_slots := GetPlaintextParts(beta: henselExponent := 1);
@@ -173,7 +173,7 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     StopTiming(timer_pack: message := "batch packing");
     timer_first_lt := StartTiming();
 
-    /*** Evaluate partial thin bootstrapping ***/
+    /*** Evaluate slot-wise noisy expansion ***/
 
     // First stage
     dimensions := [GetNbDimensions(), 1];
