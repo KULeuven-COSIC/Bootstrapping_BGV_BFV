@@ -169,7 +169,7 @@ function Add(c1, c2: print_result := true)
     PadZeros(~c1, ~c2);
     res := CopyCiphertext(<[(c1[1][i] + c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>:
                           print_result := false);
-    if print_result then
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
         hash3 := MyHash(res); CreateCiphertext(hash3);
         PrintFile(TRACE, "bootstrapper.add(*" cat hash1 cat ", *" cat hash2 cat ", *" cat
                          hash3 cat ", " cat GetHighLevelBit(res) cat ");");
@@ -191,7 +191,7 @@ function Sub(c1, c2: print_result := true)
     PadZeros(~c1, ~c2);
     res := CopyCiphertext(<[(c1[1][i] - c2[1][i]) mod c1[3] : i in [1..#c1[1]]], c1[2], c1[3], c1[4] + c2[4]>:
                           print_result := false);
-    if print_result then
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
         hash3 := MyHash(res); CreateCiphertext(hash3);
         PrintFile(TRACE, "bootstrapper.sub(*" cat hash1 cat ", *" cat hash2 cat ", *" cat
                          hash3 cat ", " cat GetHighLevelBit(res) cat ");");
@@ -225,18 +225,20 @@ function Mul(c1, c2, rk)
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~mul);
     res := CopyCiphertext(mul: print_result := false);
-    hash3 := MyHash(res); CreateCiphertext(hash3);
-    if hash1 eq hash2 then
-        PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "square(*" cat hash1 cat
-                         ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select (IntegerToString(gbfvExponent) cat ", " cat
-                         IntegerToString(gbfvCoefficient) cat ", ") else "") cat GetHighLevelBit(res) cat ");");
-    else
-        PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "multiply(*" cat hash1 cat
-                         ", *" cat hash2 cat ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select
-                         (IntegerToString(gbfvExponent) cat ", " cat IntegerToString(gbfvCoefficient) cat ", ") else "") cat
-                         GetHighLevelBit(res) cat ");");
+    if not DoesCiphertextExist(MyHash(res)) then
+        hash3 := MyHash(res); CreateCiphertext(hash3);
+        if hash1 eq hash2 then
+            PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "square(*" cat hash1 cat
+                             ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select (IntegerToString(gbfvExponent) cat
+                             ", " cat IntegerToString(gbfvCoefficient) cat ", ") else "") cat GetHighLevelBit(res) cat ");");
+        else
+            PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "multiply(*" cat hash1 cat
+                             ", *" cat hash2 cat ", bk, *" cat hash3 cat ", " cat (IsGBFVCiphertext(c1) select
+                             (IntegerToString(gbfvExponent) cat ", " cat IntegerToString(gbfvCoefficient) cat ", ") else "") cat
+                             GetHighLevelBit(res) cat ");");
+        end if;
+        UseCiphertext(hash1); UseCiphertext(hash2);
     end if;
-    UseCiphertext(hash1); UseCiphertext(hash2);
     return res;
 end function;
 
@@ -255,7 +257,7 @@ function MulConstant(c, constant: print_result := true)
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~mul);
     res := CopyCiphertext(mul: print_result := false);
-    if print_result then
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
         hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
         PrintFile(TRACE, "bootstrapper.multiply_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
                          hash3 cat ", " cat GetHighLevelBit(res) cat ");");
@@ -634,11 +636,13 @@ function ApplyAutomorphismCiphertext(c, exp_hyperIndex, switchKey)
     // Decrease current modulus for efficiency reasons
     DynamicModSwitch(~cNew);
     res := CopyCiphertext(cNew: print_result := false);
-    hash2 := MyHash(res); CreateCiphertext(hash2);
-    PrintFile(TRACE, "bootstrapper.apply_galois(*" cat hash1 cat ", bk, *" cat hash2 cat
-                     ", " cat IntegerToString(exp_hyperIndex) cat ", " cat GetHighLevelBit(res) cat ");");
-    UseCiphertext(hash1);
-    PrintFile(CONSTANTS, IntegerToString(exp_hyperIndex));
+    if not DoesCiphertextExist(MyHash(res)) then
+        hash2 := MyHash(res); CreateCiphertext(hash2);
+        PrintFile(TRACE, "bootstrapper.apply_galois(*" cat hash1 cat ", bk, *" cat hash2 cat
+                         ", " cat IntegerToString(exp_hyperIndex) cat ", " cat GetHighLevelBit(res) cat ");");
+        UseCiphertext(hash1);
+        PrintFile(CONSTANTS, IntegerToString(exp_hyperIndex));
+    end if;
     return res;
 end function;
 

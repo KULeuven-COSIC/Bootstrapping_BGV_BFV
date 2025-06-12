@@ -35,7 +35,9 @@ useFFTBatchEncoder := true;       // Use batch encoder based on FFT algorithm (o
 // GBFV parameters
 Z := Integers();                  // Integers
 Zx<x> := PolynomialRing(Z);       // Polynomial ring
-gbfvModulus := x^(2^7) - 2^(2^2); // GBFV plaintext modulus
+gbfvExponent := 2^7;              // Exponent of plaintext modulus
+gbfvCoefficient := 2^(2^2);       // Coefficient of plaintext modulus
+gbfvModulus := x ^ gbfvExponent - gbfvCoefficient;
 
 // GBFV parameters for improved bootstrapping
 n_prime := 2^5;                   // GBFV ring dimension

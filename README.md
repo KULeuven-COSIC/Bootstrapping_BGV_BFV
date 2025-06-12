@@ -14,6 +14,8 @@ The code is divided over the following folders:
 * [`Bootstrapping`](Bootstrapping) contains the actual bootstrapping algorithm for fully packed as well as for "thin" ciphertexts.
 * [`Applications`](Applications) contains an application of encrypted edit distance computation.
 * [`Scripts`](Scripts) contains a couple of scripts to search for useful parameters.
+* [`Traces`](Traces) implements functionality to export Magma programs to SEAL code.
+* [`Bootstrapping_SEAL`](Bootstrapping_SEAL) contains SEAL code to run Magma programs.
 
 ## Installation
 

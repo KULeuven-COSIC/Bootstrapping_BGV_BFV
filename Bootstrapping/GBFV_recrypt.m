@@ -43,8 +43,11 @@ function GBFVRecrypt(c, recrypt_variables)
     // Implementation is restricted to full splitting case
     assert (GetLTVersion() eq 3) and (p mod m eq 1);
 
-    mod_copy := GetPlaintextModulus(c);     // Copy original value of plaintext modulus
-    c := ScaleAndRoundCiphertext(c, mod_copy, p);
+    PrintNoiseBudget(SetPlaintextModulus(c, p): message := "initial");
+    timer_first_lt := StartTiming();
+
+    mod_copy := GetPlaintextModulus(c);                                     // Copy original value of plaintext modulus
+    c := SetPlaintextModulus(ScaleAndRoundCiphertext(c, mod_copy, p), p);   // Won't print noise budget otherwise
 
     /*** Evaluate slot-wise noisy expansion ***/
 
@@ -154,8 +157,8 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     timer_pack := StartTiming();
 
     // Convert to BFV
-    mod_copy := GetPlaintextModulus(c_list[1]);     // Copy original value of plaintext modulus
-    c_converted := [SetPlaintextModulus(c, p) : c in c_list];
+    //mod_copy := GetPlaintextModulus(c_list[1]); // Copy original value of plaintext modulus     // Not necessary anymore
+    c_converted := c_list;                        //[SetPlaintextModulus(c, p) : c in c_list];    // Not necessary anymore
 
     // Pack ciphertexts
     c := c_converted[1];
@@ -217,7 +220,7 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     timer_unpack := StartTiming();
 
     // Unpack ciphertexts
-    mod_copy := x ^ gbfvExponent - gbfvCoefficient; beta := ScaleAndRound(1, p, mod_copy);
+    mod_copy := gbfvModulus; beta := ScaleAndRound(1, p, mod_copy);
     u_list := [SetPlaintextModulus(MulConstant(u, beta ^ 2), mod_copy ^ 2)];
     for index := 1 to #c_list - 1 do
         Append(~u_list, SetPlaintextModulus(MulConstant(ApplyAutomorphismCiphertext(u,

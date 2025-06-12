@@ -176,17 +176,46 @@ procedure AutomaticModSwitchRelin(~cp)
 end procedure;
 
 // Addition with constant
-function AddConstant(c, constant)
-    return Add(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+function AddConstant(c, constant: print_result := true)
+    constant := Flatten(constant, GetPlaintextModulus(c));
+    if IsZero(constant) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
+    res := Add(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
+        hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.add_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
+        UseCiphertext(hash1); UsePlaintext(hash2, ((constant * multiplier) mod f) mod (IsHighLevel(c) select p ^ 2 else p));
+    end if;
+    return res;
 end function;
 
 // Compute ciphertext minus constant
 function SubCiphertextConstant(c, constant)
-    return Sub(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+    constant := Flatten(constant, GetPlaintextModulus(c));
+    if IsZero(constant) then
+        return c;
+    end if;
+    hash1 := MyHash(c);
+
+    res := Sub(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
+    if not DoesCiphertextExist(MyHash(res)) then
+        hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
+        PrintFile(TRACE, "bootstrapper.sub_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
+                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
+        multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
+        UseCiphertext(hash1); UsePlaintext(hash2, ((constant * multiplier) mod f) mod (IsHighLevel(c) select p ^ 2 else p));
+    end if;
+    return res;
 end function;
 
 // Compute constant minus ciphertext
 function SubConstantCiphertext(c, constant)
+    error "Subtracting is not allowed.";
     return Sub(<[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
 end function;
 
@@ -231,7 +260,7 @@ function MulNR(c1, c2: print_result := true)
     end if;
     res := CopyCiphertext(res: print_result := false);
 
-    if print_result then
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
         hash3 := MyHash(res); CreateCiphertext(hash3);
         if hash1 eq hash2 then
             PrintFile(TRACE, "bootstrapper." cat (IsGBFVCiphertext(c1) select "gbfv_" else "") cat "squareNR(*" cat hash1 cat
@@ -257,7 +286,7 @@ function Relin(c, rk: print_result := true)
 
     rel, noise := ApplyEncryptedKey(c[1][3], c[3], rk);
     res := CopyCiphertext(<[c[1][1] + rel[1], c[1][2] + rel[2]], c[2], c[3], c[4] + noise>: print_result := false);
-    if print_result then
+    if print_result and (not DoesCiphertextExist(MyHash(res))) then
         hash2 := MyHash(res); CreateCiphertext(hash2);
         PrintFile(TRACE, "bootstrapper.relinearize(*" cat hash1 cat ", bk, *" cat
                          hash2 cat ", " cat GetHighLevelBit(res) cat ");");
@@ -292,20 +321,21 @@ function ScaleAndRoundCiphertext(c, qp, q)
     ptxt_mod := ScaleAndRound(c[2], q, qp);
     res := <[ScaleAndRound(poly, qp, q) : poly in c[1]], Degree(ptxt_mod) eq 0 select Z!ptxt_mod else ptxt_mod, c[3],
             (SquareSum(qp) / SquareSum(q)) * c[4]>;
-    hash2 := MyHash(res); CreateCiphertext(hash2);
-    PrintFile(TRACE, "bootstrapper.gbfv_to_bfv(*" cat hash1 cat ", bk, *" cat hash2 cat ", " cat IntegerToString(gbfvExponent) cat
-                     ", " cat IntegerToString(gbfvCoefficient) cat ", " cat GetHighLevelBit(res) cat ");");
-    UseCiphertext(hash1);
+    if not DoesCiphertextExist(MyHash(res)) then
+        hash2 := MyHash(res); CreateCiphertext(hash2);
+        PrintFile(TRACE, "bootstrapper.gbfv_to_bfv(*" cat hash1 cat ", bk, *" cat hash2 cat ", " cat IntegerToString(gbfvExponent)
+                         cat ", " cat IntegerToString(gbfvCoefficient) cat ", " cat GetHighLevelBit(res) cat ");");
+        UseCiphertext(hash1);
+    end if;
     return res;
 end function;
 
 // Given an encryption of a plaintext that is divisible by number, divide
 // it by number and decrease the plaintext modulus with the same amount
 function ExactDivisionBy(c, number)
-    if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
-        c[2] div:= number;
-    else
-        c := <c[1], DivideOverField(c[2], number), c[3], c[4]>;
+    if IsZero(c) then
+        return GetZeroCiphertext((Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) select
+                                 (c[2] div number) else (Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number))));
     end if;
 
     res := CopyCiphertext(c);
@@ -313,7 +343,7 @@ function ExactDivisionBy(c, number)
     if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
         res[2] div:= number;    // Important: this does not change the hash value!
     else
-        res[2] := Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number));
+        res := <res[1], DivideOverField(c[2], number), res[3], res[4]>;
     end if;
     PrintFile(TRACE, "bootstrapper.high_to_low_level_inplace(*" cat hash cat ");");
     UseCiphertext(hash);        // Strictly speaking not necessary: already done in copy function
@@ -344,8 +374,10 @@ function HomomorphicInnerProduct(c, bootKey, additionConstant)
     // Replace rounding by flooring for odd p
     res := CopyCiphertext((p eq 2) select AddConstant(u, additionConstant: print_result := false) else u:
                           print_result := false);
-    hash2 := MyHash(res); CreateCiphertext(hash2);
-    PrintFile(TRACE, "bootstrapper.homomorphic_noisy_decrypt(*" cat hash1 cat ", bk, *" cat hash2 cat ");");
-    UseCiphertext(hash1);
+    if not DoesCiphertextExist(MyHash(res)) then
+        hash2 := MyHash(res); CreateCiphertext(hash2);
+        PrintFile(TRACE, "bootstrapper.homomorphic_noisy_decrypt(*" cat hash1 cat ", bk, *" cat hash2 cat ");");
+        UseCiphertext(hash1);
+    end if;
     return res;
 end function;

@@ -9,8 +9,8 @@ rk := GenRelinKey(sk);
 
 // Switch to lowest modulus before bootstrapping
 // --> Not possible to go to extremely low modulus, because of linear maps
-msq := RandPol(p);
-csq := Encrypt(msq, gbfvModulus, pk);
+msq := ScaleAndRound(RandPol(p), p, gbfvModulus);
+csq := Encrypt(msq, p, pk);
 if enableModSwitch then
     csq := ModSwitch(csq, 2 ^ 100);
 end if;
@@ -34,7 +34,7 @@ res := GBFVRecrypt(csq, recrypt_variables);
 
 "";
 "Time for GBFV bootstrapping", Cputime(t);
-"Test GBFV bootstrapping", Decrypt(res, sk) eq Flatten(msq, gbfvModulus);
+"Test GBFV bootstrapping", Decrypt(res, sk: print_result := false, check_correctness := true, expected_result := msq) eq msq;
 "Total noise in bootstrapped ciphertext", ErrorC(res, sk);
 
 "Error after bootstrapping on canonical embedding", ErrorCanC(res, sk);

@@ -1,4 +1,5 @@
 hash_prime := 634564036503856717;
+hash_length := 16;
 
 hash_ct1 := RandPol(hash_prime);
 hash_ct2 := RandPol(hash_prime);
@@ -72,66 +73,6 @@ function PolynomialToString(poly)
     end if;
 end function;
 
-// Convert number to character
-function NumberToChar(number)
-    number := number mod 26;
-    if number eq 0 then
-        return "A";
-    elif number eq 1 then
-        return "B";
-    elif number eq 2 then
-        return "C";
-    elif number eq 3 then
-        return "D";
-    elif number eq 4 then
-        return "E";
-    elif number eq 5 then
-        return "F";
-    elif number eq 6 then
-        return "G";
-    elif number eq 7 then
-        return "H";
-    elif number eq 8 then
-        return "I";
-    elif number eq 9 then
-        return "J";
-    elif number eq 10 then
-        return "K";
-    elif number eq 11 then
-        return "L";
-    elif number eq 12 then
-        return "M";
-    elif number eq 13 then
-        return "N";
-    elif number eq 14 then
-        return "O";
-    elif number eq 15 then
-        return "P";
-    elif number eq 16 then
-        return "Q";
-    elif number eq 17 then
-        return "R";
-    elif number eq 18 then
-        return "S";
-    elif number eq 19 then
-        return "T";
-    elif number eq 20 then
-        return "U";
-    elif number eq 21 then
-        return "V";
-    elif number eq 22 then
-        return "W";
-    elif number eq 23 then
-        return "X";
-    elif number eq 24 then
-        return "Y";
-    elif number eq 25 then
-        return "Z";
-    else
-        error "The number is not correctly formatted.";
-    end if;
-end function;
-
 // A very simple hash function for ciphertexts
 function MyHash(input)
     if IsZero(input) then
@@ -146,12 +87,12 @@ function MyHash(input)
             result +:= ((hash_ct5 * (input[1][3] mod hash_prime) + hash_ct6) mod f);
         end if;
     end if;
-    result := CatZeros(Eltseq(result mod hash_prime), 16);
+    result := CatZeros(Eltseq(result mod hash_prime), hash_length);
 
     // Compute hash value
     hash := "";
-    for index := 1 to 16 do
-        hash cat:= NumberToChar(result[index]);
+    for index := 1 to hash_length do
+        hash cat:= IntegerToString((result[index] mod 26) + 10, 36);
     end for;
     return hash;
 end function;
@@ -159,9 +100,8 @@ end function;
 // Return a random number in the hash range
 function RandomHash()
     hash := "";
-    for index := 1 to 16 do
-        hash cat:= Random({"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-                           "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"});
+    for index := 1 to hash_length do
+        hash cat:= IntegerToString(Random(10, 35), 36);
     end for;
     return hash;
 end function;

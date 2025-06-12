@@ -92,11 +92,14 @@ function GBFVBetterRecrypt(c, recrypt_variables)
     gen_evalInv, dim_size_evalInv, dim_good_evalInv, switchKeys_eval, switchKeys_evalInv, traceKeys,
     lowestDigitRemovalPolynomialOverRange := DecodeGBFVBetterRecryptVariables(recrypt_variables);
 
+    PrintNoiseBudget(SetPlaintextModulus(c, p): message := "initial");
+    timer_first_lt := StartTiming();
+
     // Slots to coefficients
     newModuli := intModuli cat [p];
     for stage := 1 to #gbfv_mat_dimensions do
         // Increase plaintext modulus: cheat by going to BFV domain
-        if stage + #newModuli gt #gbfv_mat_dimensions then
+        if (stage + #newModuli gt #gbfv_mat_dimensions) and (GetPlaintextModulus(c) ne p) then
             c := ScaleAndRoundCiphertext(c, GetPlaintextModulus(c), p);
         end if;
 
@@ -118,8 +121,16 @@ function GBFVBetterRecrypt(c, recrypt_variables)
     // Trace
     c := EvaluateTraceGBFV(c, traceKeys: start_index := Valuation(n div n_prime, 2) + 1);
 
+    PrintNoiseBudget(SetPlaintextModulus(c, p): message := "after first LT");
+    StopTiming(timer_first_lt: message := "first LT");
+    timer_inner_product := StartTiming();
+
     // Homomorphic inner product
     u := HomomorphicInnerProduct(c, bootKey, 0);
+
+    PrintNoiseBudget(SetPlaintextModulus(u, p ^ 2): message := "after inner product");
+    StopTiming(timer_inner_product: message := "inner product");
+    timer_second_lt := StartTiming();
 
     // Trace
     u := EvaluateTraceGBFV(u, traceKeys);
@@ -130,7 +141,7 @@ function GBFVBetterRecrypt(c, recrypt_variables)
         stage := #gbfv_mat_dimensions - iteration + 1;
 
         // Increase plaintext modulus: cheat by going to BFV domain
-        if stage + #newModuli gt #gbfv_mat_dimensions then
+        if (stage + #newModuli gt #gbfv_mat_dimensions) and (GetPlaintextModulus(u) ne (p ^ 2)) then
             u := ScaleAndRoundCiphertext(u, GetPlaintextModulus(u), p ^ 2);
         end if;
 
@@ -150,7 +161,16 @@ function GBFVBetterRecrypt(c, recrypt_variables)
         u := SetPlaintextModulus(u, gbfvModulus ^ 2);
     end if;
 
+    PrintNoiseBudget(SetPlaintextModulus(u, p ^ 2): message := "after second LT");
+    StopTiming(timer_second_lt: message := "second LT");
+    timer_digit_extract := StartTiming();
+
     // Digit extraction
-    return BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>, func<x | ExactDivisionBy(x, gbfvModulus)>,
+    res := BoundedRangeDigitExtraction(u, addFunc, func<x, y | mulFunc(x, y, rk)>, func<x | ExactDivisionBy(x, gbfvModulus)>,
                                        lowestDigitRemovalPolynomialOverRange);
+
+    PrintNoiseBudget(SetPlaintextModulus(res, p): message := "after digit extract");
+    StopTiming(timer_digit_extract: message := "digit extract");
+
+    return res;
 end function;

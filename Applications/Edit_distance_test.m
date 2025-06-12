@@ -26,7 +26,8 @@ assert n eq n_prime;
 
 
 // Strings to compare
-alphabet_size := 36;
+alphabet_size_encrypt := 36;
+alphabet_size_evaluate := 128;
 str_a := ["FHE"];
 str_b := ["HFE"];
 
@@ -39,7 +40,18 @@ expand_keys, extract_keys, key_right, key_left, boot_shift_key := PrecompKeys(sk
 
 
 // Encryption, edit distance computation and decryption
-ctxt_a, ctxt_b := EncryptStrings(str_a, str_b, alphabet_size, pk);
-ctxt_edit := EditDistance(ctxt_a, ctxt_b, len_str, alphabet_size, recrypt_variables, expand_keys, extract_keys, key_right,
+ctxt_a, ctxt_b := EncryptStrings(str_a, str_b, alphabet_size_encrypt, pk);
+timer := StartTiming();
+ctxt_edit := EditDistance(ctxt_a, ctxt_b, len_str, alphabet_size_evaluate, recrypt_variables, expand_keys, extract_keys, key_right,
                           key_left, boot_shift_key, rk: iterations_per_bootstrap := 2);
-distances := DecryptEditDistances(ctxt_edit, sk, #str_a);
+StopTiming(timer: message := "edit distance");
+DecryptEditDistances(ctxt_edit, sk, #str_a);
+
+
+
+// Check correctness
+expected_result := ScaleAndRound(Decrypt(ctxt_edit, sk), p, gbfvModulus) mod p;
+Decrypt(SetPlaintextModulus(ctxt_edit, p), sk: print_result := false, check_correctness := true,
+                                               expected_result := expected_result) eq expected_result;
+
+load "Traces/Post_processing.m";

@@ -577,12 +577,14 @@ function MatMulGeneralGBFVBabyGiant(c, adapted_constants, generators, dim_sizes,
         end for;
 
         // Compute outer sum
+        SetOptimalCoefficientDomain();
         if k eq 1 then
             w := Add(w, tmp);
         else
             auto_exp := RotToExp(generators, [g_seq[ind] * k_seq[ind] : ind in [1..#g_seq]]) mod (2 * n_prime);
             w := Add(w, ApplyAutomorphismCiphertext(tmp, auto_exp, switchKeys[2][k]));
         end if;
+        SetOptimalNTTDomain();
     end for;
     return w;
 end function;

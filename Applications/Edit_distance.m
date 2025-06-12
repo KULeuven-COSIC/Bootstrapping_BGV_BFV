@@ -27,8 +27,10 @@ function EncryptStrings(str_a, str_b, alphabet_size, pk)
             Append(~parts_a, 0); Append(~parts_b, 0);
         end if;
     end for;
-    return Encrypt(EmbedInSlots(parts_a: henselExponent := 1), gbfvModulus, pk),
-           Encrypt(EmbedInSlots(parts_b: henselExponent := 1), gbfvModulus, pk);
+    return SetPlaintextModulus(Encrypt(ScaleAndRound(EmbedInSlots(parts_a: henselExponent := 1), p, gbfvModulus), p, pk),
+                                                                                                    gbfvModulus),
+           SetPlaintextModulus(Encrypt(ScaleAndRound(EmbedInSlots(parts_b: henselExponent := 1), p, gbfvModulus), p, pk),
+                                                                                                    gbfvModulus);
 end function;
 
 // Decrypt relevant results
@@ -207,8 +209,8 @@ end function;
 
 // Evaluate polynomial g
 function EvaluateMinimum(x, y, z, rk: folding_constant := 1)
-    hy := Mul(SubConstantCiphertext(y, 1), y, rk);
-    hz := Mul(SubConstantCiphertext(z, 1), z, rk);
+    hy := Mul(AddConstant(MulConstant(y, -1), 1), y, rk);
+    hz := Mul(AddConstant(MulConstant(z, -1), 1), z, rk);
     return Add(MulConstant(x, folding_constant), Mul(MulConstant(AddConstant(x, 1), Modinv(4, p) * folding_constant),
                                                      Add(Add(MulConstant(hy, 2), MulConstant(hz, 2)), Mul(hy, hz, rk)), rk));
 end function;
@@ -223,7 +225,7 @@ end function;
 // Edit distance computation using GBFV
 function EditDistance(ctxt_a, ctxt_b, len_str, alphabet_size, recrypt_variables, expand_keys, extract_keys, key_right, key_left,
                       boot_shift_key, rk: iterations_per_bootstrap := 1)
-    assert alphabet_size le 36;
+    // assert alphabet_size le 36;
 
     // Initialize variables
     chunk_size := ChunkSize(len_str);

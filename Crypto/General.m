@@ -31,6 +31,9 @@ intModuli := [modulus mod f : modulus in intModuli];
 allModuli := [gbfvModulus] cat intModuli cat [p];
 intExponents := [gbfvExponent] cat [Degree(GCD(fp, Fp_poly!modulus)) : modulus in intModuli];
 
+// Only for SEAL traces
+assert #intModuli eq 0;
+
 
 
 // Convert the given index to a sequence of indices based on the given sizes (and minima)

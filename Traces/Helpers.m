@@ -22,6 +22,16 @@ end procedure;
 
 
 
+function DoesCiphertextExist(hash)
+    if (hash eq "ZERO_CIPHERTEXT_LOW") or (hash eq "ZERO_CIPHERTEXT_HIGH") then
+        return true;
+    elif OpenTest(output_folder cat "Files/" cat hash, "r") then
+        return true;
+    else
+        return false;
+    end if;
+end function;
+
 procedure UseCiphertext(hash: terminate := false)
     if terminate then
         PrintFile(output_folder cat "Files/" cat hash, 0: Overwrite := true);
@@ -109,5 +119,3 @@ EncryptPlaintextToCiphertext("Plaintext{ \"0\" }", "ZERO_CIPHERTEXT_LOW", false)
 EncryptPlaintextToCiphertext("Plaintext{ \"0\" }", "ZERO_CIPHERTEXT_HIGH", true);
 PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_LOW, Plaintext{ \"0\" }, 0, true);");
 PrintFile(INIT, "bootstrapper.multiply_plain_inplace(*ZERO_CIPHERTEXT_HIGH, Plaintext{ \"0\" }, 1, true);");
-
-DeleteCiphertext("ZERO_CIPHERTEXT_HIGH");
