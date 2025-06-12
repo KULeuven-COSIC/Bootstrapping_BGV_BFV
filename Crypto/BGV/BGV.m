@@ -144,17 +144,17 @@ end procedure;
 
 // Addition with constant
 function AddConstant(c, constant)
-    return Add(c, <[Zx | CenteredReduction(constant, c[2]) mod c[3]], c[2], c[3], R!0>);
+    return Add(c, <[Zx | CenteredReduction(constant mod f, c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute ciphertext minus constant
 function SubCiphertextConstant(c, constant)
-    return Sub(c, <[Zx | CenteredReduction(constant, c[2]) mod c[3]], c[2], c[3], R!0>);
+    return Sub(c, <[Zx | CenteredReduction(constant mod f, c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute constant minus ciphertext
 function SubConstantCiphertext(c, constant)
-    return Sub(<[Zx | CenteredReduction(constant, c[2]) mod c[3]], c[2], c[3], R!0>, c);
+    return Sub(<[Zx | CenteredReduction(constant mod f, c[2]) mod c[3]], c[2], c[3], R!0>, c);
 end function;
 
 // Multiplication without relinearization

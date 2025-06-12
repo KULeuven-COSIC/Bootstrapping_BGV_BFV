@@ -17,24 +17,33 @@ function InvertMatrixOverMatrix(matrix, henselExponent)
                                          index in [0..outer_dim ^ 2 - 1]]);
 end function;
 
+// Change the ring of the given matrix to some extension algebra
+function ChangeRingToExtensionAlgebra(matrix, ring)
+    if Category(matrix) eq MtrxSprs then
+        return SparseMatrix(NumberOfRows(matrix), NumberOfColumns(matrix),
+                            [<el[1], el[2], ring!Eltseq(Zx!Eltseq(el[3]))> : el in Eltseq(matrix)]);
+    else
+        return Matrix(NumberOfRows(matrix), NumberOfColumns(matrix), [ring | Eltseq(Zx!Eltseq(el)) : el in Eltseq(matrix)]);
+    end if;
+end function;
+
 // Invert the given matrix over the slot algebra
-// The entries of the matrix should be elements of Zx
-function InvertMatrixOverSlotAlgebra(matrix, henselExponent: sparse := false)
+// The entries of the matrix should be changeable to Zx and this function will also return a matrix with entries in Zx
+// If the specified matrix is sparse then the computed one will also be sparse
+function InvertMatrixOverSlotAlgebra(matrix, henselExponent)
     assert henselExponent le e;
 
     // First invert the matrix over a finite field
+    matrix := ChangeRing(matrix, Zx);
     Fp_ext := ext<GF(p) | GetFirstSlotFactor()>;
-    dim := NumberOfRows(matrix);
-    inv := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Fp_ext!Eltseq(el[3])> : el in Eltseq(matrix)]) ^ (-1) else
-                         Matrix(dim, dim, [Fp_ext | Eltseq(el) : el in Eltseq(matrix)]) ^ (-1);
+    inv := ChangeRingToExtensionAlgebra(matrix, Fp_ext) ^ (-1);
 
     // Now work over the slot algebra
     Zt_F1<y> := GetSlotAlgebra(henselExponent);
-    matrix := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Zt_F1!Eltseq(el[3])> : el in Eltseq(matrix)]) else
-                            Matrix(dim, dim, [Zt_F1 | Eltseq(el) : el in Eltseq(matrix)]);
-    inv := sparse select SparseMatrix(dim, dim, [<el[1], el[2], Zt_F1!Eltseq(Zx!Eltseq(el[3]))> : el in Eltseq(inv)]) else
-                         Matrix(dim, dim, [Zt_F1 | Eltseq(Zx!Eltseq(el)) : el in Eltseq(inv)]);
-    I := sparse select IdentitySparseMatrix(Zt_F1, dim) else IdentityMatrix(Zt_F1, dim);
+    matrix := ChangeRingToExtensionAlgebra(matrix, Zt_F1);
+    inv := ChangeRingToExtensionAlgebra(inv, Zt_F1);
+    I := (Category(matrix) eq MtrxSprs) select IdentitySparseMatrix(Zt_F1, NumberOfRows(matrix)) else
+                                               IdentityMatrix(Zt_F1, NumberOfRows(matrix));
 
     // Perform Hensel lifting
     prec := henselExponent;

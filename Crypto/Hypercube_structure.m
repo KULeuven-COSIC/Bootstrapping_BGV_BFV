@@ -4,28 +4,34 @@
 // Make sure that we have a valid factorization for the powerful basis ring
 factors_m := factors_m eq [] select PrimePowerFactorization(m) else factors_m;
 assert IsCoprimeFactorization(m, factors_m);
-assert not usePowerOfTwo or IsPowerOfTwo(m);
+assert useHElibLT or IsPowerOfTwo(m);
+assert (not useGBFVLT) or (p mod m eq 1);
 
 // Function that decides which version of the linear transformations will be used for thin bootstrapping
 // - Return value 1: HElib version
 // - Return value 2: SEAL version
 // - Return value 3: our version
+// - Return value 4: GBFV version
 // - Return value 0: building (bootstrappable) hypercube is not possible
 forward AreBootstrappableAnyOrder;
 function GetLTVersion()
     if (GCD(m, p) ne 1) or (not IsPrime(p)) then
-        return 0;                       // No hypercube possible
-    elif not usePowerOfTwo then                     
+        return 0;                   // No hypercube possible
+    elif useHElibLT then
         if AreBootstrappableAnyOrder(p, m, factors_m) then
-            return 1;                   // HElib hypercube
+            return 1;               // HElib hypercube
         else
-            return 0;                   // No bootstrappable hypercube possible
+            return 0;               // No bootstrappable hypercube possible
         end if;
-    elif mat_dimensions eq [] then
-        return 2;                       // SEAL hypercube
-    else
-        return 3;                       // Our hypercube
+    elif useSEALLT then
+        return 2;                   // SEAL hypercube
+    elif useOurLT then
+        return 3;                   // Our hypercube
+    elif useGBFVLT then
+        return 4;                   // GBFV hypercube
     end if;
+
+    error "Exactly one LT version must be set to true.";
 end function;
 
 // Get a set S of representatives of (Z/mZ)*/<p>
@@ -224,6 +230,11 @@ function GetOurHypercubeStructure(p, m, mat_dimensions)
     end if;
 end function;
 
+// Compute a hypercube structure for improved GBFV bootstrapping
+function GetGBFVHypercubeStructure(p, m)
+    return [-1, 5], [<2, 2>, <m div 4, m div 4>];
+end function;
+
 
 
 // Only build hypercube structure if it is possible to do so
@@ -239,6 +250,8 @@ if (GCD(m, p) eq 1) and IsPrime(p) then
         S, orders := GetSEALHypercubeStructure(p, m);
     elif GetLTVersion() eq 3 then
         S, orders := GetOurHypercubeStructure(p, m, mat_dimensions);
+    elif GetLTVersion() eq 4 then
+        S, orders := GetGBFVHypercubeStructure(p, m);
     elif GetLTVersion() eq 0 then
         S, orders := GetHypercubeStructure(p, m);
         "Warning: hypercube structure is not bootstrappable.";

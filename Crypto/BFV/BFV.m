@@ -114,17 +114,17 @@ end procedure;
 
 // Addition with constant
 function AddConstant(c, constant)
-    return Add(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+    return Add(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute ciphertext minus constant
 function SubCiphertextConstant(c, constant)
-    return Sub(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
+    return Sub(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute constant minus ciphertext
 function SubConstantCiphertext(c, constant)
-    return Sub(<[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
+    return Sub(<[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
 end function;
 
 // Multiplication without relinearization
@@ -195,14 +195,18 @@ function ExactDivisionBy(c, number)
     if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
         c[2] div:= number;
     else
-        c[2] := Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number));
+        c := <c[1], DivideOverField(c[2], number), c[3], c[4]>;
     end if;
     return c;
 end function;
 
 // Set the plaintext modulus to the given value
 function SetPlaintextModulus(c, modulus)
-    return <c[1], modulus, c[3], c[4]>;
+    if Category(modulus) eq RngIntElt then
+        return <c[1], modulus, c[3], c[4]>;
+    else
+        return <c[1], modulus mod f, c[3], c[4]>;
+    end if;
 end function;
 
 // Compute the homomorphic inner product of the given ciphertext with the given bootstrapping key

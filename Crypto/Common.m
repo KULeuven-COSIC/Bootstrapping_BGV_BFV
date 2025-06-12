@@ -45,12 +45,17 @@ function GetZeroCiphertext(c)
     end if;
 end function;
 
+// Return the plaintext modulus of the given ciphertext
+function GetPlaintextModulus(c)
+    return c[2];
+end function;
+
 // Return the plaintext Hensel exponent of the given ciphertext
 function GetHenselExponent(c)
-    if Category(c[2]) ne RngIntElt then
+    if Category(GetPlaintextModulus(c)) ne RngIntElt then
         error "This function does not accept GBFV ciphertexts.";
     end if;
-    return Round(Log(p, c[2]));
+    return Round(Log(p, GetPlaintextModulus(c)));
 end function;
 
 // Return the number of ciphertext parts
@@ -253,16 +258,17 @@ end function;
 // Get the sequence of factors of f mod t
 // Factor F_i corresponds to GCD(F_1(x^k), f) with k the inverse of the i'th element of S
 function GetSlotFactors()
-    // Construct polynomial ring over Galois field
-    Fp := GF(p);
-    Fp_poly := PolynomialRing(Fp);
-
-    // Get cyclotomic polynomial mod p
-    fp := Fp_poly!f;
+    // Define quotient structure
     Ffp<y> := quo<Fp_poly | fp>;
 
-    // Random first factor
-    F1 := Factorization(fp)[1][1];
+    // Choose special first factor when using GBFV and arbitrary first factor otherwise
+    tmp_factors := Factorization(fp);
+    if useGBFVLT then
+        assert ToCyclotomicField(p) * InvertOverField(gbfvModulus) in MaximalOrder(cyclo_field);
+        F1 := Random([factor[1] : factor in tmp_factors | IsDivisibleBy(Fp_poly!gbfvModulus, factor[1])]);
+    else
+        F1 := tmp_factors[1][1];
+    end if;
 
     // Different way of deriving other factors than in HElib design document
     // --> Ensure that implementation is consistent with powerful basis representation
