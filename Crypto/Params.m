@@ -4,8 +4,8 @@ IGNORE_DIGIT_EXTRACTION := false;
 //--------------------------
 
 // Parameter setup
-q := 2^2000;                      // Ciphertext modulus
-m := 2^15;                        // m-th cyclotomic polynomial
+q := 2^900;                       // Ciphertext modulus
+m := 2^10;                        // m-th cyclotomic polynomial
 p := 2^16 + 1;                    // Plaintext prime modulus
 r := 1;                           // Original Hensel lifting factor
 e := 2;                           // Extended Hensel lifting factor during bootstrapping
@@ -16,8 +16,11 @@ L := 5;                           // Number of pieces when splitting the relin k
 
 // Parameters for linear transformations
 factors_m := [];                  // Factorization of m for HElib linear transformations (prime-power factorization by default)
-mat_dimensions := [2^7, 2^7];     // Matrix dimensions for our linear transformations (specified in reverse order: L_T, ..., L_1)
-usePowerOfTwo := true;            // Use SEAL or our version of linear transformations if true and HElib version if false
+mat_dimensions := [];             // Matrix dimensions for our linear transformations (in SlotToCoeff order: L_T, ..., L_1)
+useHElibLT := false;              // Use HElib version of linear transformations
+useSEALLT := false;               // Use SEAL version of linear transformations
+useOurLT := false;                // Use our BFV version of linear transformations
+useGBFVLT := true;                // Use our improved GBFV linear transformations
 
 // Details for modulus switching and noise growth
 // The second (resp. third) parameter should be small (resp. large) enough to prevent noise blow-up
@@ -29,6 +32,13 @@ can_max := 1500;                  // To be determined experimentally from 'Scrip
 // Batch encoding in plaintext slots can be done with naive or FFT-based algorithm
 useFFTBatchEncoder := true;       // Use batch encoder based on FFT algorithm (only possible if m is a power of two)
 
-// GBFV parameters for binomial plaintext modulus
-gbfvExponent := 2^13;             // Degree of the GBFV plaintext modulus
-gbfvCoefficient := 2^8;           // Coefficient of the GBFV plaintext modulus
+// GBFV parameters
+Z := Integers();                  // Integers
+Zx<x> := PolynomialRing(Z);       // Polynomial ring
+gbfvModulus := x^(2^7) - 2^(2^2); // GBFV plaintext modulus
+
+// GBFV parameters for improved bootstrapping
+n_prime := 2^5;                   // GBFV ring dimension
+n_double_prime := 2^3;            // BFV ring dimension
+intModuli := [Zx | ];             // Intermediate GBFV plaintext moduli
+gbfv_mat_dimensions := [Z | 2^5]; // Matrix dimensions for GBFV linear transformations (in SlotToCoeff order: 2^(l_1), ..., 2^(l_s))

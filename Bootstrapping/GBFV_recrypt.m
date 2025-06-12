@@ -4,7 +4,7 @@ load "Bootstrapping/Thin_recrypt.m";
 // Recrypt GBFV ciphertext based on black-box approach
 // The required recryption variables are the same ones as for thin bootstrapping
 function GBFVRecryptBlackBox(c, recrypt_variables)
-    mod_copy := c[2];   // Copy original value of plaintext modulus
+    mod_copy := GetPlaintextModulus(c);     // Copy original value of plaintext modulus
     c := ScaleAndRoundCiphertext(c, mod_copy, p);
     c := ThinRecrypt(c, recrypt_variables);
     return ScaleAndRoundCiphertext(c, p, mod_copy);
@@ -15,12 +15,11 @@ function GenerateGBFVRecryptVariables(sk, pk, B)
     variables := GenerateThinRecryptVariables(sk, pk, 1, 2, B);
 
     // Multiply lowest digit removal polynomial by inverse of beta
-    base_modulus := x ^ gbfvExponent - gbfvCoefficient;
-    beta := Zx!Eltseq(ToCyclotomicField(p) * common_inverses[Index(common_moduli, ToCyclotomicField(base_modulus))]);
+    beta := Zx!Eltseq(ToCyclotomicField(p) * InvertOverField(gbfvModulus));
     beta_slots := GetPlaintextParts(beta: henselExponent := 1);
     Zt_F1<y> := GetSlotAlgebra(1);      // Inverse computed over slot algebra for non-zero elements only
     beta_inverse_slots := [Zx | (el eq 0) select 0 else (Zt_F1!el) ^ (-1) : el in beta_slots];
-    beta_inverse := Flatten(EmbedInSlots(beta_inverse_slots: henselExponent := 1), base_modulus);
+    beta_inverse := Flatten(EmbedInSlots(beta_inverse_slots: henselExponent := 1), gbfvModulus);
     lowestDigitRemovalPolynomialOverRange := Evaluate(variables[13], PolynomialRing(Zx).1) * beta_inverse;
 
     // Multiply LT constants by beta ^ 2
@@ -44,11 +43,8 @@ function GBFVRecrypt(c, recrypt_variables)
     // Implementation is restricted to full splitting case
     assert (GetLTVersion() eq 3) and (p mod m eq 1);
 
-    PrintNoiseBudget(SetPlaintextModulus(c, p): message := "initial");
-    timer_first_lt := StartTiming();
-
-    mod_copy := x ^ gbfvExponent - gbfvCoefficient;                         // Copy original value of plaintext modulus
-    c := SetPlaintextModulus(ScaleAndRoundCiphertext(c, mod_copy, p), p);   // Won't print noise budget otherwise
+    mod_copy := GetPlaintextModulus(c);     // Copy original value of plaintext modulus
+    c := ScaleAndRoundCiphertext(c, mod_copy, p);
 
     /*** Evaluate slot-wise noisy expansion ***/
 
@@ -121,12 +117,11 @@ function GenerateGBFVBatchRecryptVariables(sk, pk, B)
     variables := GenerateThinRecryptVariables(sk, pk, 1, 2, B);
 
     // Multiply lowest digit removal polynomial by square of inverse of beta
-    base_modulus := x ^ gbfvExponent - gbfvCoefficient;
-    beta := Zx!Eltseq(ToCyclotomicField(p) * common_inverses[Index(common_moduli, ToCyclotomicField(base_modulus))]);
+    beta := Zx!Eltseq(ToCyclotomicField(p) * InvertOverField(gbfvModulus));
     beta_slots := GetPlaintextParts(beta: henselExponent := 1);
     Zt_F1<y> := GetSlotAlgebra(1);      // Inverse computed over slot algebra for non-zero elements only
     beta_inverse_slots := [Zx | (el eq 0) select 0 else (Zt_F1!el) ^ (-1) : el in beta_slots];
-    beta_inverse_square := Flatten(EmbedInSlots(beta_inverse_slots: henselExponent := 1) ^ 2, base_modulus);
+    beta_inverse_square := Flatten(EmbedInSlots(beta_inverse_slots: henselExponent := 1) ^ 2, gbfvModulus);
     lowestDigitRemovalPolynomialOverRange := Evaluate(variables[13], PolynomialRing(Zx).1) * beta_inverse_square;
 
     // Construct packing and unpacking keys
@@ -159,8 +154,8 @@ function GBFVBatchRecrypt(c_list, recrypt_variables)
     timer_pack := StartTiming();
 
     // Convert to BFV
-    //mod_copy := c_list[1][2]; // Copy original value of plaintext modulus     // Not necessary anymore
-    c_converted := c_list;      //[SetPlaintextModulus(c, p) : c in c_list];    // Not necessary anymore
+    mod_copy := GetPlaintextModulus(c_list[1]);     // Copy original value of plaintext modulus
+    c_converted := [SetPlaintextModulus(c, p) : c in c_list];
 
     // Pack ciphertexts
     c := c_converted[1];

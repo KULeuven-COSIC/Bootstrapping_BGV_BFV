@@ -512,3 +512,163 @@ function RepackSlotsPowerOfTwo(c_seq)
     SetOptimalNTTDomain();
     return result[1];
 end function;
+
+/*** GBFV linear transformations ***/
+
+// Apply linear transformation to a ciphertext c in multiple dimensions
+function MatMulGeneralGBFV(c, constants, generators, dim_sizes, dim_good, switchKeys)
+    // Compute loop sizes and starting points
+    loop_sizes := [dim_good[i] select dim_sizes[i] else 2 * dim_sizes[i] - 1 : i in [1..#generators]];
+    minima := [dim_good[i] select 0 else -dim_sizes[i] + 1 : i in [1..#generators]];
+
+    // Apply each rotation separately
+    res := GetZeroCiphertext(c);
+    for i := 1 to &*loop_sizes do
+        auto_exp := RotToExp(generators, IndexToSequence(i, loop_sizes: minima := minima)) mod (2 * n_prime);
+        if auto_exp eq 1 then
+            res := Add(res, MulConstant(c, constants[i]));
+        else
+            res := Add(res, MulConstant(ApplyAutomorphismCiphertext(c, auto_exp, switchKeys[i]), constants[i]));
+        end if;
+    end for;
+    return res;
+end function;
+
+// Apply linear transformation to a ciphertext c in multiple dimensions
+function MatMulGeneralGBFVBabyGiant(c, adapted_constants, generators, dim_sizes, dim_good, switchKeys)
+    // Compute loop sizes, starting points and splitting parameters
+    loop_sizes := [dim_good[i] select dim_sizes[i] else 2 * dim_sizes[i] - 1 : i in [1..#generators]];
+    minima := [dim_good[i] select 0 else -dim_sizes[i] + 1 : i in [1..#generators]];
+    g_seq, h_seq := GetGeneralBabyGiantParams(loop_sizes);
+
+    v := [];    // Precompute small number of rotations
+    for j := 1 to &*g_seq do
+        auto_exp := RotToExp(generators, IndexToSequence(j, g_seq: minima := minima)) mod (2 * n_prime);
+        if auto_exp eq 1 then
+            Append(~v, c);
+        else
+            Append(~v, ApplyAutomorphismCiphertext(c, auto_exp, switchKeys[1][j]));
+        end if;
+    end for;
+
+    // Compute remaining sum
+    w := GetZeroCiphertext(c);
+    for k := 1 to &*h_seq do
+        // Sequence of k
+        k_seq := IndexToSequence(k, h_seq);
+        tmp := GetZeroCiphertext(c);
+        for j := 1 to &*g_seq do
+            // Sequence of j and i
+            j_seq := IndexToSequence(j, g_seq: minima := minima);
+            i_seq := [j_seq[ind] + g_seq[ind] * k_seq[ind] : ind in [1..#j_seq]];
+
+            // Skip the current iteration if we are not in the valid range
+            skip := false;
+            for index := 1 to #loop_sizes do
+                if i_seq[index] ge loop_sizes[index] + minima[index] then
+                    skip := true;
+                end if;
+            end for;
+
+            // Compute inner sum
+            if not skip then
+                tmp := Add(tmp, MulConstant(v[j], adapted_constants[SequenceToIndex(i_seq, loop_sizes: minima := minima)]));
+            end if;
+        end for;
+
+        // Compute outer sum
+        if k eq 1 then
+            w := Add(w, tmp);
+        else
+            auto_exp := RotToExp(generators, [g_seq[ind] * k_seq[ind] : ind in [1..#g_seq]]) mod (2 * n_prime);
+            w := Add(w, ApplyAutomorphismCiphertext(tmp, auto_exp, switchKeys[2][k]));
+        end if;
+    end for;
+    return w;
+end function;
+
+// Compute the adapted constants for the baby-step/giant-step algorithm
+function MatMulGeneralGBFVAdaptedConstants(constants, generators, dim_sizes, dim_good, henselExponent)
+    // Compute loop sizes, starting points and splitting parameters
+    loop_sizes := [dim_good[i] select dim_sizes[i] else 2 * dim_sizes[i] - 1 : i in [1..#generators]];
+    minima := [dim_good[i] select 0 else -dim_sizes[i] + 1 : i in [1..#generators]];
+    g_seq, h_seq := GetGeneralBabyGiantParams(loop_sizes);
+
+    // Compute adapted constants
+    adapted_constants := [];
+    for k := 1 to &*h_seq do
+        // Sequence of k
+        k_seq := IndexToSequence(k, h_seq);
+        for j := 1 to &*g_seq do
+            // Sequence of j and i
+            j_seq := IndexToSequence(j, g_seq: minima := minima);
+            i_seq := [j_seq[ind] + g_seq[ind] * k_seq[ind] : ind in [1..#j_seq]];
+
+            // Skip the current iteration if we are not in the valid range
+            skip := false;
+            for index := 1 to #loop_sizes do
+                if i_seq[index] ge loop_sizes[index] + minima[index] then
+                    skip := true;
+                end if;
+            end for;
+
+            // Compute inverse automorphism
+            if not skip then
+                auto_exp := RotToExp(generators, [-g_seq[ind] * k_seq[ind] : ind in [1..#g_seq]]) mod (2 * n_prime);
+                index := SequenceToIndex(i_seq, loop_sizes: minima := minima);
+                adapted_constants[index] := ApplyAutomorphismPlaintext(constants[index], auto_exp:
+                                                                       henselExponent := henselExponent);
+            end if;
+        end for;
+    end for;
+    return adapted_constants;
+end function;
+
+// Generate required key switching keys
+function MatMulGeneralGBFVSwitchKeys(sk, generators, dim_sizes, dim_good)
+    // Compute loop sizes and starting points
+    loop_sizes := [dim_good[i] select dim_sizes[i] else 2 * dim_sizes[i] - 1 : i in [1..#generators]];
+    minima := [dim_good[i] select 0 else -dim_sizes[i] + 1 : i in [1..#generators]];
+
+    keys := [];         // Generate all possible switch keys
+    for i := 1 to &*loop_sizes do
+        auto_exp := RotToExp(generators, IndexToSequence(i, loop_sizes: minima := minima)) mod (2 * n_prime);
+        if auto_exp ne 1 then
+            keys[i] := GenSwitchKey(sk, auto_exp);
+        end if;
+    end for;
+    return keys;
+end function;
+
+// Generate required key switching keys
+function MatMulGeneralGBFVBabyGiantSwitchKeys(sk, generators, dim_sizes, dim_good)
+    // Compute loop sizes, starting points and splitting parameters
+    loop_sizes := [dim_good[i] select dim_sizes[i] else 2 * dim_sizes[i] - 1 : i in [1..#generators]];
+    minima := [dim_good[i] select 0 else -dim_sizes[i] + 1 : i in [1..#generators]];
+    g_seq, h_seq := GetGeneralBabyGiantParams(loop_sizes);
+
+    keys := [[], []];   // Generate all possible switch keys
+    for j := 1 to &*g_seq do
+        auto_exp := RotToExp(generators, IndexToSequence(j, g_seq: minima := minima)) mod (2 * n_prime);
+        if auto_exp ne 1 then
+            keys[1][j] := GenSwitchKey(sk, auto_exp);
+        end if;
+    end for;
+
+    for k := 1 to &*h_seq do
+        k_seq := IndexToSequence(k, h_seq);
+        auto_exp := RotToExp(generators, [g_seq[ind] * k_seq[ind] : ind in [1..#g_seq]]) mod (2 * n_prime);
+        if k ne 1 then
+            keys[2][k] := GenSwitchKey(sk, auto_exp);
+        end if;
+    end for;
+    return keys;
+end function;
+
+// Evaluate trace to a subring
+function EvaluateTraceGBFV(c, traceKeys: start_index := 1, end_index := Valuation(n div n_double_prime, 2))
+    for index := start_index to end_index do
+        c := Add(c, ApplyAutomorphismCiphertext(c, GetHypercubeRepresentative((n div (2 ^ index)) + 1), traceKeys[index]));
+    end for;
+    return c;
+end function;

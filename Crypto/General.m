@@ -1,18 +1,18 @@
 // This file stores some helper functions
 //--------------------------
 load "Crypto/Params.m";
+assert (useHElibLT select 1 else 0) + (useSEALLT select 1 else 0) +
+       (useOurLT select 1 else 0) + (useGBFVLT select 1 else 0) eq 1;
 
 // Encryption parameters
 n := EulerPhi(m);   // Degree of f(x)
 t := p^e;           // Plaintext modulus during bootstrapping
 
-// Integers and quotient rings
-Z := Integers();
+// Quotient rings
 Zm := Integers(m);
 Zt := Integers(t);
 
 // Polynomial rings
-Zx<x> := PolynomialRing(Z);
 Zt_poly := PolynomialRing(Zt);
 f := Zx!CyclotomicPolynomial(m);
 
@@ -24,27 +24,33 @@ cyclo_field := ext<Q | f>;
 R := RealField(10);
 C := ComplexField(10);
 
+// Compute exponent for GBFV
+Fp_poly := PolynomialRing(GF(p)); fp := Fp_poly!f;
+gbfvExponent := Degree(GCD(fp, Fp_poly!gbfvModulus));
+intModuli := [modulus mod f : modulus in intModuli];
+allModuli := [gbfvModulus] cat intModuli cat [p];
+intExponents := [gbfvExponent] cat [Degree(GCD(fp, Fp_poly!modulus)) : modulus in intModuli];
 
 
-// Convert the given index to a sequence of indices based on the given maxima
-function IndexToSequence(index, max_seq)
-    index -:= 1;
-    result := [Z | ];
-    for max in max_seq do
-        Append(~result, index mod max);
-        index := index div max;
+
+// Convert the given index to a sequence of indices based on the given sizes (and minima)
+function IndexToSequence(index, sizes: minima := [0 : i in sizes])
+    index -:= 1; result := [Z | ];  // Start counting from zero in sequence
+    for i := 1 to #sizes do
+        Append(~result, (index mod sizes[i]) + minima[i]);
+        index := index div sizes[i];
     end for;
     return result;
 end function;
 
-// Convert the given sequence of indices to a regular index based on the given maxima
-function SequenceToIndex(ind_seq, max_seq)
-    result := #ind_seq eq 0 select 0 else ind_seq[#ind_seq];
+// Convert the given sequence of indices to a regular index based on the given sizes (and minima)
+function SequenceToIndex(ind_seq, sizes: minima := [0 : i in sizes])
+    result := (#ind_seq eq 0) select 0 else (ind_seq[#ind_seq] - minima[#minima]);
     for index := 1 to #ind_seq - 1 do
-        result *:= max_seq[#ind_seq - index];
-        result +:= ind_seq[#ind_seq - index];
+        result *:= sizes[#sizes - index];
+        result +:= (ind_seq[#ind_seq - index] - minima[#minima - index]);
     end for;
-    return result + 1;
+    return result + 1;              // Start counting from one in index
 end function;
 
 // Return the number that is the lowest in absolute value
@@ -80,22 +86,34 @@ end function;
 
 // Convert the given integer polynomial to the cyclotomic field
 function ToCyclotomicField(poly)
-    return cyclo_field!CatZeros(Eltseq(poly mod f), n);
+    return cyclo_field!CatZeros(Eltseq((Zx!poly) mod f), n);
 end function;
 
 // Precompute inverses of t^i and p^i
-common_moduli := [ToCyclotomicField(x ^ gbfvExponent - gbfvCoefficient) ^ i : i in [1..e]] cat
+common_moduli := [ToCyclotomicField(gbfvModulus) ^ i : i in [1..e]] cat
+                 &cat[[ToCyclotomicField(modulus) ^ i : i in [1..e]] : modulus in intModuli] cat
                  [ToCyclotomicField(p) ^ i : i in [1..e]];
-common_inverses := [i eq 1 select ToCyclotomicField(x ^ gbfvExponent - gbfvCoefficient) ^ (-1) else
+common_inverses := [i eq 1 select ToCyclotomicField(gbfvModulus) ^ (-1) else
                                   Self(i - 1) * Self(1) : i in [1..e]] cat
+                   &cat[[i eq 1 select ToCyclotomicField(modulus) ^ (-1) else
+                                       Self(i - 1) * Self(1) : i in [1..e]] : modulus in intModuli] cat
                    [i eq 1 select ToCyclotomicField(p) ^ (-1) else Self(i - 1) * Self(1) : i in [1..e]];
+
+// Compute inverse of given number
+function InvertOverField(element)
+    element := ToCyclotomicField(element);      // Make sure that the element is in the field
+    return (Index(common_moduli, element) eq 0) select element ^ (-1) else common_inverses[Index(common_moduli, element)];
+end function;
+
+// Divide the given polynomials that are known to be divisible in the cyclomtic ring
+function DivideOverField(numerator, denominator)
+    return Zx!Eltseq(ToCyclotomicField(numerator) * InvertOverField(denominator));
+end function;
 
 // Flatten the given polynomial with respect to t
 function Flatten(poly, t)
-    t := ToCyclotomicField(t);
-    t_inverse := (Index(common_moduli, t) eq 0) select t ^ (-1) else common_inverses[Index(common_moduli, t)];
-    seq := CenteredReductionRationalSequence(Eltseq(ToCyclotomicField(poly) * t_inverse));
-    return Zx!Eltseq(t * (cyclo_field!seq));
+    seq := CenteredReductionRationalSequence(Eltseq(ToCyclotomicField(poly) * InvertOverField(t)));
+    return Zx!Eltseq(ToCyclotomicField(t) * (cyclo_field!seq));
 end function;
 
 // Scale and round a sequence over 1/q where q is a scalar
@@ -108,9 +126,7 @@ function ScaleAndRound(poly, qp, q)
     if Category(q) eq RngIntElt then    // Optimized implementation
         return Zx!ScaleAndRoundSequence(Eltseq((poly * qp) mod f), q);
     else
-        q := ToCyclotomicField(q);
-        q_inverse := (Index(common_moduli, q) eq 0) select q ^ (-1) else common_inverses[Index(common_moduli, q)];
-        return Zx!ScaleAndRoundSequence(Eltseq(ToCyclotomicField(poly) * ToCyclotomicField(qp) * q_inverse), 1);
+        return Zx!ScaleAndRoundSequence(Eltseq(ToCyclotomicField(poly) * ToCyclotomicField(qp) * InvertOverField(q)), 1);
     end if;
 end function;
 
@@ -233,7 +249,7 @@ end function;
 
 // Check if the given parameter is a power of two
 function IsPowerOfTwo(m)
-    result, p, r := IsPrimePower(m);
+    result, p, r := IsPrimePower(2 * m);
     return result and (p eq 2);
 end function;
 

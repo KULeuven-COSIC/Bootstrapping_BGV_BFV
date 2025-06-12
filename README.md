@@ -12,7 +12,8 @@ The code is divided over the following folders:
 * [`Linear maps`](Linear%20maps) provides functionality to map plaintext coefficients to slots and vice versa.
 * [`Digit extraction`](Digit%20extraction) is necessary to extract the upper digits of a sparsely packed or "thin" ciphertext.
 * [`Bootstrapping`](Bootstrapping) contains the actual bootstrapping algorithm for fully packed as well as for "thin" ciphertexts.
-* [`Traces`](Traces) implements functionality to export Magma programs to SEAL code.
+* [`Applications`](Applications) contains an application of encrypted edit distance computation.
+* [`Scripts`](Scripts) contains a couple of scripts to search for useful parameters.
 
 ## Installation
 

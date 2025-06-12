@@ -176,45 +176,18 @@ procedure AutomaticModSwitchRelin(~cp)
 end procedure;
 
 // Addition with constant
-function AddConstant(c, constant: print_result := true)
-    constant := Flatten(constant, GetPlaintextModulus(c));
-    if IsZero(constant) then
-        return c;
-    end if;
-    hash1 := MyHash(c);
-
-    res := Add(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
-    if print_result then
-        hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
-        PrintFile(TRACE, "bootstrapper.add_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
-                         hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-        multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
-        UseCiphertext(hash1); UsePlaintext(hash2, (constant * multiplier) mod (IsHighLevel(c) select p ^ 2 else p));
-    end if;
-    return res;
+function AddConstant(c, constant)
+    return Add(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute ciphertext minus constant
 function SubCiphertextConstant(c, constant)
-    constant := Flatten(constant, GetPlaintextModulus(c));
-    if IsZero(constant) then
-        return c;
-    end if;
-    hash1 := MyHash(c);
-
-    res := Sub(c, <[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>: print_result := false);
-    hash2 := RandomHash(); hash3 := MyHash(res); CreateCiphertext(hash3);
-    PrintFile(TRACE, "bootstrapper.sub_plain(*" cat hash1 cat ", " cat hash2 cat ", *" cat
-                     hash3 cat ", " cat GetHighLevelBit(res) cat ");");
-    multiplier := ScaleAndRound(1, IsHighLevel(c) select p ^ 2 else p, GetPlaintextModulus(c));
-    UseCiphertext(hash1); UsePlaintext(hash2, (constant * multiplier) mod (IsHighLevel(c) select p ^ 2 else p));
-    return res;
+    return Sub(c, <[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>);
 end function;
 
 // Compute constant minus ciphertext
 function SubConstantCiphertext(c, constant)
-    error "Subtracting is not allowed.";
-    return Sub(<[Zx | ScaleAndRound(constant, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
+    return Sub(<[Zx | ScaleAndRound(constant mod f, c[3], c[2]) mod c[3]], c[2], c[3], R!0>, c);
 end function;
 
 // Multiplication without relinearization
@@ -329,9 +302,10 @@ end function;
 // Given an encryption of a plaintext that is divisible by number, divide
 // it by number and decrease the plaintext modulus with the same amount
 function ExactDivisionBy(c, number)
-    if IsZero(c) then
-        return GetZeroCiphertext((Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) select
-                                 (c[2] div number) else (Zx!Eltseq(ToCyclotomicField(c[2]) / ToCyclotomicField(number))));
+    if (Category(c[2]) eq RngIntElt) and (Category(number) eq RngIntElt) then
+        c[2] div:= number;
+    else
+        c := <c[1], DivideOverField(c[2], number), c[3], c[4]>;
     end if;
 
     res := CopyCiphertext(c);
@@ -348,7 +322,11 @@ end function;
 
 // Set the plaintext modulus to the given value
 function SetPlaintextModulus(c, modulus)
-    return <c[1], modulus, c[3], c[4]>;
+    if Category(modulus) eq RngIntElt then
+        return <c[1], modulus, c[3], c[4]>;
+    else
+        return <c[1], modulus mod f, c[3], c[4]>;
+    end if;
 end function;
 
 // Compute the homomorphic inner product of the given ciphertext with the given bootstrapping key
