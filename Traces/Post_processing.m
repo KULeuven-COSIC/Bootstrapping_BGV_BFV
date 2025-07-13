@@ -23,8 +23,8 @@ end for;
 // Concatenate files to get final trace
 PrintFile(output_folder cat "trace.cpp", "#include \"trace.h\"\n": Overwrite := true);
 PrintFile(output_folder cat "trace.cpp", "void run_trace(Bootstrapper& bootstrapper, const BootstrappingKey& bk, " cat
-                                          "Encryptor& encryptor, Decryptor& decryptor,\n\t\t\t   " cat
-                                          "Encryptor& target_encryptor, Decryptor& target_decryptor)");
+                                         "Encryptor& encryptor, Decryptor& decryptor,\n\t\t\t   " cat
+                                         "Encryptor& target_encryptor, Decryptor& target_decryptor)");
 PrintFile(output_folder cat "trace.cpp", "{\n\t// INIT");
 PrintFile(output_folder cat "trace.cpp", &cat["\n\t" cat el : el in Split(Read(INIT))]);
 PrintFile(output_folder cat "trace.cpp", "\n\t// TRACE");
