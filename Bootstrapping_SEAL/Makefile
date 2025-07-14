@@ -1,4 +1,3 @@
-HEADERS = bootstrapping.h constants.h contextchain.h trace.h extended_evaluator.h sparse_key_generator.h
 SOURCES = bootstrapping.cpp constants.cpp contextchain.cpp trace.cpp seal.cpp extended_evaluator.cpp sparse_key_generator.cpp
 SEAL_DIR = /home/rgeelen/libs/seal
 
