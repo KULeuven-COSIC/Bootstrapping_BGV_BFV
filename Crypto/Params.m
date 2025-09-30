@@ -43,4 +43,4 @@ gbfvModulus := x ^ gbfvExponent - gbfvCoefficient;
 n_prime := 2^5;                   // GBFV ring dimension
 n_double_prime := 2^3;            // BFV ring dimension
 intModuli := [Zx | ];             // Intermediate GBFV plaintext moduli
-gbfv_mat_dimensions := [Z | 2^5]; // Matrix dimensions for GBFV linear transformations (in SlotToCoeff order: 2^(l_1), ..., 2^(l_s))
+gbfv_mat_dimensions := [Z | 2^5]; // Matrix dimensions for GBFV linear transformations (in SlotToCoeff order: 2^(L_1), ..., 2^(L_s))
